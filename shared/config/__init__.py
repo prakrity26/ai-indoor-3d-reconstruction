@@ -1,1 +1,1 @@
-"""Environment and device configuration (later phases)."""
+"""Shared configuration (Phase 1: preprocessing limits and paths)."""

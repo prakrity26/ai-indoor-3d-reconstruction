@@ -3,7 +3,7 @@
 Reconstruction engine library.
 
 **Phases:** 1–9  
-**Status:** package skeleton only
+**Status:** Phase 1 (`preprocessing`) implemented; later stages are placeholders
 
 The worker (Phase 12) will call this library. Stages are separate packages so they can be implemented, tested, and replaced independently.
 

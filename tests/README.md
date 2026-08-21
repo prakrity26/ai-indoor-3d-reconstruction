@@ -1,5 +1,11 @@
 # tests
 
-**Phase:** 15 is the hardening pass; each earlier phase should add tests for the behavior it introduces.
+Each phase adds tests for the behavior it introduces.
 
-Phase 0 has no production code to test. Layout validation is run from the repository root (see the session notes / daily log).
+Phase 1: `test_preprocessing.py` covers validation failures and uniform frame extraction using synthetic OpenCV videos. No large real indoor videos are committed.
+
+```bash
+source .venv/bin/activate
+pip install -e ".[dev]"
+pytest
+```

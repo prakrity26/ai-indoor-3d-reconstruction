@@ -4,7 +4,7 @@ A modular system for 3D scene reconstruction and spatial understanding from mono
 
 This repository is an internship engineering project. The reconstruction engine is designed as a reusable module that a company application can call through a REST API, without depending on the Streamlit UI or on internal pipeline details.
 
-**Current status:** Phase 0 — project planning and architecture. No reconstruction, API, database, or UI implementation yet.
+**Current status:** Phase 1 — video ingestion and preprocessing. No pose, depth, mesh, API, database, or UI yet.
 
 ## Problem
 
@@ -35,7 +35,9 @@ Interactive 3D exploration  (or API consumption by another app)
 - A claim of a new fundamental reconstruction algorithm unless one is later implemented and evaluated
 - A promise of ground-truth geometry
 
-## Architecture (Phase 0)
+## Architecture
+
+Five services, one Compose file. The UI talks only to the API. The API does not run reconstruction inline. The worker will own the reconstruction engine. Phase 1 implements the first `model/` stage as a local library.
 
 Five services, one Compose file. The UI talks only to the API. The API does not run reconstruction inline. The worker owns the reconstruction engine.
 
@@ -79,8 +81,8 @@ Work proceeds **one phase at a time**. Do not start the next phase until the cur
 
 | Phase | Focus |
 |------:|-------|
-| 0 | Planning and architecture (this commit) |
-| 1 | Video ingestion and preprocessing |
+| 0 | Planning and architecture | done |
+| 1 | Video ingestion and preprocessing | this commit |
 | 2 | Adaptive frame selection |
 | 3 | Camera pose estimation |
 | 4 | Depth estimation |
@@ -105,16 +107,22 @@ Development is on Apple Silicon. The design assumes:
 - PyTorch MPS when a model phase needs it, with CPU fallback
 - A later production host may enable CUDA through a device abstraction
 
-## Local setup (Phase 0)
+## Local setup (Phase 1)
 
-Phase 0 does not install ML libraries.
+Requires Python 3.10 or newer (Homebrew `python3.10` on this Apple Silicon machine).
 
 ```bash
 cp .env.example .env
-docker compose config
+python3.10 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+pytest
+python -m model.preprocessing path/to/indoor_video.mp4
 ```
 
-`docker compose config` validates the Compose skeleton. PostgreSQL and Redis images are declared but are not required to be started in Phase 0. Application services (`ui`, `api`, `worker`) are commented until their phases.
+OpenCV is the only computer-vision dependency in this phase. Frames are written under `data/frames/<job_id>/` and are gitignored.
+
+`docker compose config` still validates the Compose skeleton. Application services are not built yet.
 
 ## Documentation
 
