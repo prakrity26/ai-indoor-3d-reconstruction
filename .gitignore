@@ -1,0 +1,73 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+
+# Local project documentation — keep on disk, do not publish to GitHub
+docs/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# Runtime / generated data (keep directory placeholders)
+data/uploads/*
+!data/uploads/.gitkeep
+data/frames/*
+!data/frames/.gitkeep
+data/outputs/*
+!data/outputs/.gitkeep
+
+# Model weights and large artifacts
+*.pt
+*.pth
+*.onnx
+*.ckpt
+*.safetensors
+*.bin
+*.h5
+*.glb
+*.gltf
+*.ply
+*.pcd
+*.xyz
+*.obj
+*.stl
+*.npy
+*.npz
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+
+# Docker
+docker-data/
+postgres-data/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Logs
+*.log
+logs/

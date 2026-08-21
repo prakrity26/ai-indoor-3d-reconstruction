@@ -1,0 +1,17 @@
+[project]
+name = "ai-indoor-3d-reconstruction"
+version = "0.0.0"
+description = "Modular system for 3D scene reconstruction and spatial understanding from monocular indoor video"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = []
+
+# Dependencies are added only when a phase needs them.
+# Do not install the full ML stack during Phase 0.
+
+[project.optional-dependencies]
+dev = []
+
+[tool.setuptools.packages.find]
+include = ["api*", "ui*", "model*", "database*", "queue*", "shared*"]
