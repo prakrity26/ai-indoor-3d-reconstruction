@@ -4,7 +4,7 @@ A modular system for 3D scene reconstruction and spatial understanding from mono
 
 This repository is an internship engineering project. The reconstruction engine is designed as a reusable module that a company application can call through a REST API, without depending on the Streamlit UI or on internal pipeline details.
 
-**Current status:** Phase 1 — video ingestion and preprocessing. No pose, depth, mesh, API, database, or UI yet.
+**Current status:** Phase 5 — initial point cloud from posed depth. No mesh, API, database, or UI yet.
 
 ## Problem
 
@@ -37,9 +37,7 @@ Interactive 3D exploration  (or API consumption by another app)
 
 ## Architecture
 
-Five services, one Compose file. The UI talks only to the API. The API does not run reconstruction inline. The worker will own the reconstruction engine. Phase 1 implements the first `model/` stage as a local library.
-
-Five services, one Compose file. The UI talks only to the API. The API does not run reconstruction inline. The worker owns the reconstruction engine.
+Five services, one Compose file. The UI talks only to the API. The API does not run reconstruction inline. The worker will own the reconstruction engine. Phases 1–5 implement the first `model/` stages as a local library.
 
 ```text
                  Streamlit UI
@@ -82,11 +80,11 @@ Work proceeds **one phase at a time**. Do not start the next phase until the cur
 | Phase | Focus |
 |------:|-------|
 | 0 | Planning and architecture | done |
-| 1 | Video ingestion and preprocessing | this commit |
-| 2 | Adaptive frame selection |
-| 3 | Camera pose estimation |
-| 4 | Depth estimation |
-| 5 | 3D point-cloud generation |
+| 1 | Video ingestion and preprocessing | done |
+| 2 | Adaptive frame selection | done |
+| 3 | Camera pose estimation | done |
+| 4 | Depth estimation | done |
+| 5 | 3D point-cloud generation | implemented |
 | 6 | Point-cloud filtering and fusion |
 | 7 | Mesh reconstruction and GLB/PLY export |
 | 8 | Object detection and scene understanding |
@@ -107,20 +105,28 @@ Development is on Apple Silicon. The design assumes:
 - PyTorch MPS when a model phase needs it, with CPU fallback
 - A later production host may enable CUDA through a device abstraction
 
-## Local setup (Phase 1)
+## Local setup (Phases 1–5)
 
 Requires Python 3.10 or newer (Homebrew `python3.10` on this Apple Silicon machine).
+
+Put **your own** indoor phone video in `data/uploads/` (or pass any local path). Do not use Hugging Face demo videos.
 
 ```bash
 cp .env.example .env
 python3.10 -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev]"
+pip install -e ".[dev,depth]"
 pytest
-python -m model.preprocessing path/to/indoor_video.mp4
+python -m model.preprocessing data/uploads/your_room.mp4
+python -m model.frame_selection data/frames/<job_id>
+python -m model.camera data/frames/<job_id>
+python -m model.depth data/frames/<job_id>
+python -m model.reconstruction data/frames/<job_id>
 ```
 
-OpenCV is the only computer-vision dependency in this phase. Frames are written under `data/frames/<job_id>/` and are gitignored.
+Phases 1–3 and 5 use OpenCV/NumPy. Phase 4 adds optional PyTorch + transformers (Depth Anything V2 Small). Open `data/frames/<job_id>/cloud.ply` in MeshLab or CloudCompare. Filtering/fusion is Phase 6.
+
+Artifacts land under `data/frames/<job_id>/` (and a PLY copy under `data/outputs/<job_id>/`) and are gitignored.
 
 `docker compose config` still validates the Compose skeleton. Application services are not built yet.
 

@@ -1,4 +1,4 @@
-"""Environment-backed settings used by preprocessing (Phase 1)."""
+"""Environment-backed settings used by preprocessing, keyframes, pose, depth, and reconstruction."""
 
 from __future__ import annotations
 
@@ -67,3 +67,191 @@ class PreprocessSettings:
 
 def load_settings() -> PreprocessSettings:
     return PreprocessSettings.from_env()
+
+
+@dataclass(frozen=True)
+class FrameSelectionSettings:
+    min_count: int
+    max_count: int
+    min_gap: int
+    max_gap: int
+    diff_threshold: float
+    thumbnail_size: int
+    sharpness_width: int
+
+    @classmethod
+    def from_env(cls) -> FrameSelectionSettings:
+        return cls(
+            min_count=_int("KEYFRAME_MIN_COUNT", 8),
+            max_count=_int("KEYFRAME_MAX_COUNT", 120),
+            min_gap=_int("KEYFRAME_MIN_GAP", 1),
+            max_gap=_int("KEYFRAME_MAX_GAP", 8),
+            diff_threshold=_float("KEYFRAME_DIFF_THRESHOLD", 0.08),
+            thumbnail_size=_int("KEYFRAME_THUMBNAIL_SIZE", 64),
+            sharpness_width=_int("KEYFRAME_SHARPNESS_WIDTH", 320),
+        )
+
+    def validate(self) -> None:
+        if self.min_count < 1:
+            raise ValueError("KEYFRAME_MIN_COUNT must be >= 1")
+        if self.max_count < self.min_count:
+            raise ValueError("KEYFRAME_MAX_COUNT must be >= KEYFRAME_MIN_COUNT")
+        if self.min_gap < 1:
+            raise ValueError("KEYFRAME_MIN_GAP must be >= 1")
+        if self.max_gap < self.min_gap:
+            raise ValueError("KEYFRAME_MAX_GAP must be >= KEYFRAME_MIN_GAP")
+        if not 0.0 <= self.diff_threshold <= 1.0:
+            raise ValueError("KEYFRAME_DIFF_THRESHOLD must be in [0, 1]")
+        if self.thumbnail_size < 8:
+            raise ValueError("KEYFRAME_THUMBNAIL_SIZE must be >= 8")
+        if self.sharpness_width < 16:
+            raise ValueError("KEYFRAME_SHARPNESS_WIDTH must be >= 16")
+
+
+def load_frame_selection_settings() -> FrameSelectionSettings:
+    settings = FrameSelectionSettings.from_env()
+    settings.validate()
+    return settings
+
+
+@dataclass(frozen=True)
+class CameraPoseSettings:
+    focal_scale: float
+    fx: float | None
+    fy: float | None
+    cx: float | None
+    cy: float | None
+    orb_features: int
+    ratio_test: float
+    ransac_thresh: float
+    min_matches: int
+    min_inliers: int
+    max_pair_skip: int
+
+    @classmethod
+    def from_env(cls) -> CameraPoseSettings:
+        return cls(
+            focal_scale=_float("POSE_FOCAL_SCALE", 1.2),
+            fx=_optional_float("POSE_FX"),
+            fy=_optional_float("POSE_FY"),
+            cx=_optional_float("POSE_CX"),
+            cy=_optional_float("POSE_CY"),
+            orb_features=_int("POSE_ORB_FEATURES", 2000),
+            ratio_test=_float("POSE_RATIO_TEST", 0.75),
+            ransac_thresh=_float("POSE_RANSAC_THRESH", 1.0),
+            min_matches=_int("POSE_MIN_MATCHES", 40),
+            min_inliers=_int("POSE_MIN_INLIERS", 20),
+            max_pair_skip=_int("POSE_MAX_PAIR_SKIP", 2),
+        )
+
+    def validate(self) -> None:
+        if self.focal_scale <= 0:
+            raise ValueError("POSE_FOCAL_SCALE must be > 0")
+        if self.orb_features < 100:
+            raise ValueError("POSE_ORB_FEATURES must be >= 100")
+        if not 0.5 <= self.ratio_test <= 1.0:
+            raise ValueError("POSE_RATIO_TEST must be in [0.5, 1]")
+        if self.ransac_thresh <= 0:
+            raise ValueError("POSE_RANSAC_THRESH must be > 0")
+        if self.min_matches < 8:
+            raise ValueError("POSE_MIN_MATCHES must be >= 8")
+        if self.min_inliers < 8:
+            raise ValueError("POSE_MIN_INLIERS must be >= 8")
+        if self.max_pair_skip < 1:
+            raise ValueError("POSE_MAX_PAIR_SKIP must be >= 1")
+
+
+def _optional_float(name: str) -> float | None:
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return None
+    return float(raw)
+
+
+def load_camera_pose_settings() -> CameraPoseSettings:
+    settings = CameraPoseSettings.from_env()
+    settings.validate()
+    return settings
+
+
+def _bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None or not str(raw).strip():
+        return default
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
+@dataclass(frozen=True)
+class DepthSettings:
+    model_id: str
+    local_files_only: bool
+    max_size: int
+    write_preview: bool
+    compute_device: str
+
+    @classmethod
+    def from_env(cls) -> DepthSettings:
+        return cls(
+            model_id=os.environ.get(
+                "DEPTH_MODEL_ID",
+                "depth-anything/Depth-Anything-V2-Small-hf",
+            ).strip()
+            or "depth-anything/Depth-Anything-V2-Small-hf",
+            local_files_only=_bool("DEPTH_LOCAL_FILES_ONLY", False),
+            max_size=_int("DEPTH_MAX_SIZE", 768),
+            write_preview=_bool("DEPTH_WRITE_PREVIEW", True),
+            compute_device=os.environ.get("COMPUTE_DEVICE", "auto").strip().lower() or "auto",
+        )
+
+    def validate(self) -> None:
+        if not self.model_id:
+            raise ValueError("DEPTH_MODEL_ID must not be empty")
+        if self.max_size < 64:
+            raise ValueError("DEPTH_MAX_SIZE must be >= 64")
+        if self.compute_device not in {"auto", "cpu", "mps", "cuda"}:
+            raise ValueError("COMPUTE_DEVICE must be auto, cpu, mps, or cuda")
+
+
+def load_depth_settings() -> DepthSettings:
+    settings = DepthSettings.from_env()
+    settings.validate()
+    return settings
+
+
+@dataclass(frozen=True)
+class ReconstructionSettings:
+    stride: int
+    min_depth: float
+    max_depth: float
+    median_target: float
+    max_points: int
+    output_dir: Path
+
+    @classmethod
+    def from_env(cls) -> ReconstructionSettings:
+        return cls(
+            stride=_int("CLOUD_STRIDE", 8),
+            min_depth=_float("CLOUD_MIN_DEPTH", 0.05),
+            max_depth=_float("CLOUD_MAX_DEPTH", 20.0),
+            median_target=_float("CLOUD_MEDIAN_TARGET", 1.0),
+            max_points=_int("CLOUD_MAX_POINTS", 400000),
+            output_dir=Path(os.environ.get("OUTPUT_DIR", "./data/outputs")),
+        )
+
+    def validate(self) -> None:
+        if self.stride < 1:
+            raise ValueError("CLOUD_STRIDE must be >= 1")
+        if self.min_depth <= 0:
+            raise ValueError("CLOUD_MIN_DEPTH must be > 0")
+        if self.max_depth <= self.min_depth:
+            raise ValueError("CLOUD_MAX_DEPTH must be > CLOUD_MIN_DEPTH")
+        if self.median_target < 0:
+            raise ValueError("CLOUD_MEDIAN_TARGET must be >= 0")
+        if self.max_points < 100:
+            raise ValueError("CLOUD_MAX_POINTS must be >= 100")
+
+
+def load_reconstruction_settings() -> ReconstructionSettings:
+    settings = ReconstructionSettings.from_env()
+    settings.validate()
+    return settings

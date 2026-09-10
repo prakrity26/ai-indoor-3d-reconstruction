@@ -1,1 +1,1 @@
-"""Shared configuration (Phase 1: preprocessing limits and paths)."""
+"""Shared configuration (Phases 1–5: preprocessing through initial cloud)."""
