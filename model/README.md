@@ -3,7 +3,7 @@
 Reconstruction engine library.
 
 **Phases:** 1–9  
-**Status:** Phases 1–5 (`preprocessing`, `frame_selection`, `camera`, `depth`, `reconstruction`) implemented; later stages are placeholders
+**Status:** Phases 1–6 (`preprocessing` through `pointcloud`) implemented; later stages are placeholders
 
 The worker (Phase 12) will call this library. Stages are separate packages so they can be implemented, tested, and replaced independently.
 
@@ -18,4 +18,4 @@ The worker (Phase 12) will call this library. Stages are separate packages so th
 | `mesh` | Mesh + GLB/PLY |
 | `scene_understanding` | Detection and 3D association |
 
-Do not install detector libraries until Phase 8. Depth extras are optional: `pip install -e ".[depth]"`.
+Do not install detector libraries until Phase 8. Optional extras: `pip install -e ".[depth]"` and `pip install -e ".[cloud]"`.

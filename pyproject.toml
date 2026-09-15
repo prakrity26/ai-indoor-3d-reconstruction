@@ -19,6 +19,9 @@ depth = [
     "transformers>=4.41,<5",
     "pillow>=10,<12",
 ]
+cloud = [
+    "open3d>=0.18,<0.20",
+]
 
 [build-system]
 requires = ["setuptools>=69"]
@@ -30,3 +33,6 @@ include = ["api*", "ui*", "model*", "database*", "queue*", "shared*"]
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+# Open3D depends on Dash, which registers a pytest plugin that imports stdlib
+# `queue`. This repo's `queue/` package would otherwise break collection.
+addopts = ["-p", "no:dash"]

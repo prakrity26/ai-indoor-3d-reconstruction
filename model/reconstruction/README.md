@@ -31,7 +31,7 @@ python -m model.reconstruction data/frames/<job_id>
 4. Concatenate views and cap `CLOUD_MAX_POINTS`.
 5. Write a binary RGB PLY.
 
-Open3D is deferred to Phase 6 (filtering / fusion).
+Open3D is used in Phase 6 (`model.pointcloud`) for filtering and voxel fusion.
 
 ## Outputs
 

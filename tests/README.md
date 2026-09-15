@@ -10,10 +10,14 @@ Phase 3: `test_camera_pose.py` recovers a known synthetic two-plane motion up to
 
 Phase 4: `test_depth.py` writes local `.npy` maps with a fake estimator, prefers posed cameras, and does not download Hugging Face videos or weights.
 
-Phase 5: `test_reconstruction.py` unprojects a known plane, writes PLY, and builds a cloud from a synthetic job folder. Open3D is not used. No large real indoor videos are committed.
+Phase 5: `test_reconstruction.py` unprojects a known plane, writes PLY, and builds a cloud from a synthetic job folder.
+
+Phase 6: `test_pointcloud.py` crops flyers and, with Open3D installed, statistical-filters and voxel-fuses a noisy cluster. No large real indoor videos are committed.
 
 ```bash
 source .venv/bin/activate
-pip install -e ".[dev]"
+pip install -e ".[dev,cloud]"
 pytest
 ```
+
+Collection disables the Dash pytest plugin (`-p no:dash` in `pyproject.toml`) because this repo's `queue/` package shadows the stdlib module Dash imports.

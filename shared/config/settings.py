@@ -1,4 +1,4 @@
-"""Environment-backed settings used by preprocessing, keyframes, pose, depth, and reconstruction."""
+"""Environment-backed settings used by preprocessing through point-cloud filtering."""
 
 from __future__ import annotations
 
@@ -253,5 +253,44 @@ class ReconstructionSettings:
 
 def load_reconstruction_settings() -> ReconstructionSettings:
     settings = ReconstructionSettings.from_env()
+    settings.validate()
+    return settings
+
+
+@dataclass(frozen=True)
+class PointCloudFilterSettings:
+    nb_neighbors: int
+    std_ratio: float
+    voxel_size: float
+    crop_percentile: float
+    min_points: int
+    output_dir: Path
+
+    @classmethod
+    def from_env(cls) -> PointCloudFilterSettings:
+        return cls(
+            nb_neighbors=_int("CLOUD_FILTER_NB_NEIGHBORS", 20),
+            std_ratio=_float("CLOUD_FILTER_STD_RATIO", 2.0),
+            voxel_size=_float("CLOUD_VOXEL_SIZE", 0.02),
+            crop_percentile=_float("CLOUD_CROP_PERCENTILE", 1.0),
+            min_points=_int("CLOUD_FILTER_MIN_POINTS", 100),
+            output_dir=Path(os.environ.get("OUTPUT_DIR", "./data/outputs")),
+        )
+
+    def validate(self) -> None:
+        if self.nb_neighbors < 4:
+            raise ValueError("CLOUD_FILTER_NB_NEIGHBORS must be >= 4")
+        if self.std_ratio <= 0:
+            raise ValueError("CLOUD_FILTER_STD_RATIO must be > 0")
+        if self.voxel_size <= 0:
+            raise ValueError("CLOUD_VOXEL_SIZE must be > 0")
+        if not 0.0 <= self.crop_percentile < 50.0:
+            raise ValueError("CLOUD_CROP_PERCENTILE must be in [0, 50)")
+        if self.min_points < 10:
+            raise ValueError("CLOUD_FILTER_MIN_POINTS must be >= 10")
+
+
+def load_pointcloud_filter_settings() -> PointCloudFilterSettings:
+    settings = PointCloudFilterSettings.from_env()
     settings.validate()
     return settings

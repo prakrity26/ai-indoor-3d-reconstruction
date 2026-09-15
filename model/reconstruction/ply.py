@@ -1,4 +1,4 @@
-"""Write a colored XYZ RGB PLY without Open3D (Phase 6)."""
+"""Read and write colored XYZ RGB PLY (binary little-endian, this project's format)."""
 
 from __future__ import annotations
 
@@ -44,3 +44,35 @@ def write_ply_xyzrgb(path: Path, points: np.ndarray, colors: np.ndarray) -> None
     with path.open("wb") as handle:
         handle.write(header.encode("ascii"))
         vertices.tofile(handle)
+
+
+_VERTEX_DTYPE = np.dtype(
+    [
+        ("x", "<f4"),
+        ("y", "<f4"),
+        ("z", "<f4"),
+        ("red", "u1"),
+        ("green", "u1"),
+        ("blue", "u1"),
+    ]
+)
+
+
+def read_ply_xyzrgb(path: Path) -> tuple[np.ndarray, np.ndarray]:
+    """Read a PLY written by `write_ply_xyzrgb`."""
+    raw = Path(path).read_bytes()
+    marker = b"end_header\n"
+    offset = raw.find(marker)
+    if offset < 0:
+        raise ValueError(f"PLY header not found: {path}")
+    header = raw[: offset + len(marker)].decode("ascii", errors="replace")
+    count = 0
+    for line in header.splitlines():
+        if line.startswith("element vertex"):
+            count = int(line.split()[-1])
+            break
+    body = raw[offset + len(marker) :]
+    vertices = np.frombuffer(body, dtype=_VERTEX_DTYPE, count=count)
+    points = np.stack([vertices["x"], vertices["y"], vertices["z"]], axis=1).astype(np.float32)
+    colors = np.stack([vertices["red"], vertices["green"], vertices["blue"]], axis=1).astype(np.uint8)
+    return points, colors
