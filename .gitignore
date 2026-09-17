@@ -45,6 +45,9 @@ data/outputs/*
 *.glb
 *.gltf
 *.ply
+*.splat
+*.ksplat
+*.spz
 *.pcd
 *.xyz
 *.obj

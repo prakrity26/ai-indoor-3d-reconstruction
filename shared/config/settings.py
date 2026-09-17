@@ -1,4 +1,4 @@
-"""Environment-backed settings used by preprocessing through point-cloud filtering."""
+"""Environment-backed settings used by preprocessing through mesh export."""
 
 from __future__ import annotations
 
@@ -292,5 +292,95 @@ class PointCloudFilterSettings:
 
 def load_pointcloud_filter_settings() -> PointCloudFilterSettings:
     settings = PointCloudFilterSettings.from_env()
+    settings.validate()
+    return settings
+
+
+@dataclass(frozen=True)
+class MeshSettings:
+    poisson_depth: int
+    normal_radius: float
+    normal_max_nn: int
+    orient_k: int
+    density_quantile: float
+    bbox_scale: float
+    min_triangles: int
+    max_triangles: int
+    write_glb: bool
+    output_dir: Path
+
+    @classmethod
+    def from_env(cls) -> MeshSettings:
+        return cls(
+            poisson_depth=_int("MESH_POISSON_DEPTH", 8),
+            normal_radius=_float("MESH_NORMAL_RADIUS", 0.05),
+            normal_max_nn=_int("MESH_NORMAL_MAX_NN", 30),
+            orient_k=_int("MESH_ORIENT_K", 15),
+            density_quantile=_float("MESH_DENSITY_QUANTILE", 0.02),
+            bbox_scale=_float("MESH_BBOX_SCALE", 1.1),
+            min_triangles=_int("MESH_MIN_TRIANGLES", 50),
+            max_triangles=_int("MESH_MAX_TRIANGLES", 200000),
+            write_glb=_bool("MESH_WRITE_GLB", True),
+            output_dir=Path(os.environ.get("OUTPUT_DIR", "./data/outputs")),
+        )
+
+    def validate(self) -> None:
+        if self.poisson_depth < 5 or self.poisson_depth > 12:
+            raise ValueError("MESH_POISSON_DEPTH must be in [5, 12]")
+        if self.normal_radius <= 0:
+            raise ValueError("MESH_NORMAL_RADIUS must be > 0")
+        if self.normal_max_nn < 8:
+            raise ValueError("MESH_NORMAL_MAX_NN must be >= 8")
+        if self.orient_k < 4:
+            raise ValueError("MESH_ORIENT_K must be >= 4")
+        if not 0.0 <= self.density_quantile < 0.5:
+            raise ValueError("MESH_DENSITY_QUANTILE must be in [0, 0.5)")
+        if self.bbox_scale < 1.0 or self.bbox_scale > 2.0:
+            raise ValueError("MESH_BBOX_SCALE must be in [1, 2]")
+        if self.min_triangles < 1:
+            raise ValueError("MESH_MIN_TRIANGLES must be >= 1")
+        if self.max_triangles < 0:
+            raise ValueError("MESH_MAX_TRIANGLES must be >= 0")
+
+
+def load_mesh_settings() -> MeshSettings:
+    settings = MeshSettings.from_env()
+    settings.validate()
+    return settings
+
+
+@dataclass(frozen=True)
+class SplatSettings:
+    extract_fps: float
+    max_frames: int
+    image_max_size: int
+    colmap_bin: str
+    train_steps: int
+    output_dir: Path
+
+    @classmethod
+    def from_env(cls) -> SplatSettings:
+        return cls(
+            extract_fps=_float("SPLAT_EXTRACT_FPS", 8.0),
+            max_frames=_int("SPLAT_MAX_FRAMES", 250),
+            image_max_size=_int("SPLAT_IMAGE_MAX_SIZE", 1280),
+            colmap_bin=os.environ.get("SPLAT_COLMAP_BIN", "colmap").strip() or "colmap",
+            train_steps=_int("SPLAT_TRAIN_STEPS", 3000),
+            output_dir=Path(os.environ.get("OUTPUT_DIR", "./data/outputs")),
+        )
+
+    def validate(self) -> None:
+        if self.extract_fps <= 0:
+            raise ValueError("SPLAT_EXTRACT_FPS must be > 0")
+        if self.max_frames < 8:
+            raise ValueError("SPLAT_MAX_FRAMES must be >= 8")
+        if self.image_max_size < 256:
+            raise ValueError("SPLAT_IMAGE_MAX_SIZE must be >= 256")
+        if self.train_steps < 100:
+            raise ValueError("SPLAT_TRAIN_STEPS must be >= 100")
+
+
+def load_splat_settings() -> SplatSettings:
+    settings = SplatSettings.from_env()
     settings.validate()
     return settings

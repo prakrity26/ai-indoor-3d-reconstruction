@@ -4,7 +4,7 @@ A modular system for 3D scene reconstruction and spatial understanding from mono
 
 This repository is an internship engineering project. The reconstruction engine is designed as a reusable module that a company application can call through a REST API, without depending on the Streamlit UI or on internal pipeline details.
 
-**Current status:** Phase 6 — filtered / voxel-fused point cloud. No mesh, API, database, or UI yet.
+**Current status:** Phase 7 mesh exists as a laptop fallback. The **product look** (Captures-like walkable splat) is `model/splat` in **this same repo**, trained on Colab GPU. No object detection, API, or Streamlit UI yet.
 
 ## Problem
 
@@ -37,7 +37,7 @@ Interactive 3D exploration  (or API consumption by another app)
 
 ## Architecture
 
-Five services, one Compose file. The UI talks only to the API. The API does not run reconstruction inline. The worker will own the reconstruction engine. Phases 1–6 implement the first `model/` stages as a local library.
+Five services, one Compose file. The UI talks only to the API. The API does not run reconstruction inline. The worker will own the reconstruction engine. Phases 1–7 are the local mesh library. Gaussian splat training is the same repository (`model/splat` + `notebooks/`); Colab only provides a GPU.
 
 ```text
                  Streamlit UI
@@ -62,7 +62,8 @@ Python packages use lowercase names. They map to the conceptual modules UI, API,
 ai-indoor-3d-reconstruction/
 ├── ui/                 # Streamlit (Phase 13)
 ├── api/                # FastAPI (Phase 10)
-├── model/              # Reconstruction engine (Phases 1–9)
+├── model/              # Reconstruction engine (Phases 1–9 + splat path)
+├── notebooks/          # Colab GPU notebooks (clone this repo; not a second project)
 ├── database/           # Persistence (Phase 11)
 ├── queue/              # Async workers (Phase 12)
 ├── shared/             # Schemas, config, utilities
@@ -85,8 +86,8 @@ Work proceeds **one phase at a time**. Do not start the next phase until the cur
 | 3 | Camera pose estimation | done |
 | 4 | Depth estimation | done |
 | 5 | 3D point-cloud generation | done |
-| 6 | Point-cloud filtering and fusion | implemented |
-| 7 | Mesh reconstruction and GLB/PLY export |
+| 6 | Point-cloud filtering and fusion | done |
+| 7 | Mesh reconstruction and GLB/PLY export | implemented |
 | 8 | Object detection and scene understanding |
 | 9 | Evaluation and benchmarking |
 | 10 | FastAPI service |
@@ -103,9 +104,10 @@ Development is on Apple Silicon. The design assumes:
 
 - No NVIDIA CUDA on the development machine
 - PyTorch MPS when a model phase needs it, with CPU fallback
+- **Gaussian splat training uses NVIDIA CUDA.** Development GPU is Google Colab running **this** repo. A later worker can use the same `python -m model.splat` command.
 - A later production host may enable CUDA through a device abstraction
 
-## Local setup (Phases 1–6)
+## Local setup (Phases 1–7)
 
 Requires Python 3.10 or newer (Homebrew `python3.10` on this Apple Silicon machine).
 
@@ -123,11 +125,20 @@ python -m model.camera data/frames/<job_id>
 python -m model.depth data/frames/<job_id>
 python -m model.reconstruction data/frames/<job_id>
 python -m model.pointcloud data/frames/<job_id>
+python -m model.mesh data/frames/<job_id>
 ```
 
-Phase 4 needs `.[depth]`. Phase 6 needs `.[cloud]` (Open3D). Open `data/frames/<job_id>/cloud_filtered.ply` in MeshLab or CloudCompare. Mesh export is Phase 7.
+Phase 4 needs `.[depth]`. Phases 6–7 need `.[cloud]` (Open3D). `mesh.glb` is the laptop fallback. For a Captures-like walkable splat, use **this repo** on Colab:
 
-Artifacts land under `data/frames/<job_id>/` (and PLY copies under `data/outputs/<job_id>/`) and are gitignored.
+```bash
+# Mac: extract overlapping frames only
+python -m model.splat data/uploads/your_room.mp4 --job-id room_splat --prepare-only
+
+# Colab GPU: open notebooks/colab_gaussian_splat.ipynb (clones this GitHub repo)
+# then download splat/point_cloud.ply and open ui/splat_viewer.html
+```
+
+Artifacts land under `data/frames/<job_id>/` (and copies under `data/outputs/<job_id>/`) and are gitignored.
 
 `docker compose config` still validates the Compose skeleton. Application services are not built yet.
 

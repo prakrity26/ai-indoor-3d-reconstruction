@@ -1,1 +1,1 @@
-"""Shared configuration (Phases 1–6: preprocessing through cloud filtering)."""
+"""Shared configuration (Phases 1–7 plus the Gaussian splat path)."""

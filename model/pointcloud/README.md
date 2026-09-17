@@ -5,7 +5,7 @@
 
 This package denoise-crops and voxel-fuses the Phase 5 concatenated cloud.
 
-It does **not** build a mesh (Phase 7). Scale is still relative. Voxel downsampling is the fusion step: nearby points from overlapping views collapse into one.
+It does **not** build a mesh itself. Phase 7 (`model.mesh`) Poisson-meshes `cloud_filtered.ply`. Scale is still relative. Voxel downsampling is the fusion step: nearby points from overlapping views collapse into one.
 
 ## Public API
 

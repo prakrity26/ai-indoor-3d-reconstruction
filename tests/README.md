@@ -12,7 +12,11 @@ Phase 4: `test_depth.py` writes local `.npy` maps with a fake estimator, prefers
 
 Phase 5: `test_reconstruction.py` unprojects a known plane, writes PLY, and builds a cloud from a synthetic job folder.
 
-Phase 6: `test_pointcloud.py` crops flyers and, with Open3D installed, statistical-filters and voxel-fuses a noisy cluster. No large real indoor videos are committed.
+Phase 6: `test_pointcloud.py` crops flyers and, with Open3D installed, statistical-filters and voxel-fuses a noisy cluster.
+
+Phase 7: `test_mesh.py` rejects a missing filtered cloud and, with Open3D installed, Poisson-meshes a synthetic sphere to PLY and GLB.
+
+Splat path: `test_splat.py` prepares overlapping JPEGs in this repo and checks COLMAP TXT parsing. Training is CUDA-only (Colab) and is not run in pytest.
 
 ```bash
 source .venv/bin/activate
