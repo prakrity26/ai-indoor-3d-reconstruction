@@ -118,7 +118,7 @@ def train_gsplat(
             width=frame["width"],
             height=frame["height"],
             packed=False,
-            sh_degree=0,
+            sh_degree=None,
         )
         pred = renders[0]
         target = frame["image"]
@@ -132,6 +132,8 @@ def train_gsplat(
         loss = torch.abs(pred - target).mean()
         loss.backward()
         optimizer.step()
+        if step % 50 == 0 or step == steps - 1:
+            print(f"splat step {step}/{steps} loss={float(loss):.4f}", flush=True)
 
     sh_dc = ((rgb.detach().clamp(0, 1) - 0.5) / 0.28209479177387814).cpu().numpy()
     write_gaussian_ply(

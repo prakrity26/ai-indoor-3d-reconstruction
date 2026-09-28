@@ -1,0 +1,14 @@
+{
+  "job_id": "room20260814",
+  "pipeline": "phases_1_to_7_mesh",
+  "strategy": "open3d_poisson",
+  "filtered_cloud_points": 160666,
+  "vertex_count": 12022,
+  "triangle_count": 23743,
+  "scale": "relative_monocular",
+  "files": {
+    "mesh_glb": "mesh.glb",
+    "mesh_ply": "mesh.ply",
+    "cloud_filtered_ply": "cloud_filtered.ply"
+  }
+}

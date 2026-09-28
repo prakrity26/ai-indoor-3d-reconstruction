@@ -89,11 +89,13 @@ def _run_sfm(colmap: str, image_dir: Path, database: Path, sparse: Path, *, use_
         ],
         [
             colmap,
-            "exhaustive_matcher",
+            "sequential_matcher",
             "--database_path",
             str(database),
             "--SiftMatching.use_gpu",
             use_gpu,
+            "--SequentialMatching.overlap",
+            "12",
         ],
         [
             colmap,
@@ -121,19 +123,14 @@ def _first_sparse_model(sparse: Path) -> Path:
 
 
 def _run(command: list[str]) -> None:
+    print("COLMAP:", " ".join(command[:4]), flush=True)
     try:
-        completed = subprocess.run(
-            command,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
+        completed = subprocess.run(command, check=False)
     except OSError as exc:
         raise SplatError("colmap_exec", str(exc), {"command": command[:2]}) from exc
     if completed.returncode != 0:
-        tail = (completed.stderr or completed.stdout or "")[-2000:]
         raise SplatError(
             "colmap_failed",
             "COLMAP command failed.",
-            {"command": command[:3], "log": tail},
+            {"command": command[:4], "returncode": completed.returncode},
         )

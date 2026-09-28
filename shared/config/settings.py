@@ -362,10 +362,10 @@ class SplatSettings:
     def from_env(cls) -> SplatSettings:
         return cls(
             extract_fps=_float("SPLAT_EXTRACT_FPS", 8.0),
-            max_frames=_int("SPLAT_MAX_FRAMES", 250),
+            max_frames=_int("SPLAT_MAX_FRAMES", 80),
             image_max_size=_int("SPLAT_IMAGE_MAX_SIZE", 1280),
             colmap_bin=os.environ.get("SPLAT_COLMAP_BIN", "colmap").strip() or "colmap",
-            train_steps=_int("SPLAT_TRAIN_STEPS", 3000),
+            train_steps=_int("SPLAT_TRAIN_STEPS", 800),
             output_dir=Path(os.environ.get("OUTPUT_DIR", "./data/outputs")),
         )
 

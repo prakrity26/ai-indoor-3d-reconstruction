@@ -4,7 +4,49 @@ A modular system for 3D scene reconstruction and spatial understanding from mono
 
 This repository is an internship engineering project. The reconstruction engine is designed as a reusable module that a company application can call through a REST API, without depending on the Streamlit UI or on internal pipeline details.
 
-**Current status:** Phase 7 mesh exists as a laptop fallback. The **product look** (Captures-like walkable splat) is `model/splat` in **this same repo**, trained on Colab GPU. No object detection, API, or Streamlit UI yet.
+**Current status:** Phases 1–7 are implemented (video → frames → pose → depth → cloud → mesh). Sample mesh outputs are in [`samples/`](samples/README.md). A walkable Gaussian splat for a second clip (`img7916`) is trained on Colab and is not stored in git until the PLY is saved. No object detection, API, or Streamlit product UI yet.
+
+## For mentor review
+
+GitHub account: **[prakrity26](https://github.com/prakrity26)**  
+Repository: **https://github.com/prakrity26/ai-indoor-3d-reconstruction**
+
+| What to look at | Where |
+|-----------------|--------|
+| Code through week 05 / Phases 1–7 | `model/` (preprocessing → mesh) |
+| Mesh output (orbit) | `samples/room20260814/mesh.glb` |
+| Filtered point cloud | `samples/room20260814/cloud_filtered.ply` |
+| How to open the mesh | `python -m ui.demo --job-id room20260814` |
+| Optional splat training | `notebooks/colab_gaussian_splat.ipynb` then `python -m ui.splat_demo` |
+
+After clone:
+
+```bash
+python3.10 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+python -m ui.demo --job-id room20260814
+```
+
+That serves **http://127.0.0.1:8765/** from the checked-in sample GLB. Internet is needed once for the viewer library.
+
+## Mesh preview (local)
+
+The indoor clip is already reconstructed. Do **not** re-train splat on stage.
+
+```bash
+# from the project root, with the venv active
+python -m ui.demo --job-id room20260814
+```
+
+Show: selected frames on the left, orbitable GLB on the right. Say: relative scale, estimated mesh, API still remaining.
+
+To rebuild only the mesh from the existing filtered cloud (optional, needs `.[cloud]`):
+
+```bash
+python -m model.mesh data/frames/room20260814
+```
+
 
 ## Problem
 
@@ -135,7 +177,7 @@ Phase 4 needs `.[depth]`. Phases 6–7 need `.[cloud]` (Open3D). `mesh.glb` is t
 python -m model.splat data/uploads/your_room.mp4 --job-id room_splat --prepare-only
 
 # Colab GPU: open notebooks/colab_gaussian_splat.ipynb (clones this GitHub repo)
-# then download splat/point_cloud.ply and open ui/splat_viewer.html
+# then save point_cloud.ply and run: python -m ui.splat_demo --job-id img7916
 ```
 
 Artifacts land under `data/frames/<job_id>/` (and copies under `data/outputs/<job_id>/`) and are gitignored.

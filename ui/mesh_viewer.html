@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Indoor 3D reconstruction — mid-defense demo</title>
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
+  <style>
+    :root { color-scheme: dark; }
+    html, body { margin: 0; height: 100%; background: #12141a; color: #e8eaef; font-family: system-ui, sans-serif; }
+    header {
+      padding: 12px 18px;
+      background: #1b1e27;
+      border-bottom: 1px solid #2c3140;
+    }
+    header h1 { margin: 0; font-size: 1.05rem; font-weight: 650; }
+    header p { margin: 4px 0 0; font-size: 0.85rem; color: #9aa3b5; }
+    .layout { display: grid; grid-template-columns: 240px 1fr; height: calc(100% - 64px); }
+    aside {
+      overflow: auto;
+      border-right: 1px solid #2c3140;
+      padding: 12px;
+    }
+    aside h2 { margin: 0 0 8px; font-size: 0.8rem; letter-spacing: 0.04em; text-transform: uppercase; color: #9aa3b5; }
+    .thumbs { display: grid; gap: 8px; }
+    .thumbs img { width: 100%; border-radius: 6px; background: #000; }
+    model-viewer { width: 100%; height: 100%; background: #0d0f14; }
+    .hint { font-size: 0.8rem; color: #9aa3b5; margin-top: 12px; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>AI-Based Indoor 3D Reconstruction — live preview</h1>
+    <p>Monocular indoor video → reconstructed mesh (GLB). Orbit: drag. Zoom: scroll. This page does not run reconstruction.</p>
+  </header>
+  <div class="layout">
+    <aside>
+      <h2>Selected frames</h2>
+      <div id="thumbs" class="thumbs"></div>
+      <p class="hint">If frames do not load, the mesh on the right is still the mid-defense result. You can also drop a local <code>mesh.glb</code> below.</p>
+      <p><input id="file" type="file" accept=".glb,.gltf" /></p>
+    </aside>
+    <model-viewer
+      id="viewer"
+      src="/mesh.glb"
+      camera-controls
+      touch-action="pan-y"
+      shadow-intensity="0.6"
+      exposure="1.05"
+      environment-image="neutral"
+      alt="Reconstructed indoor mesh"
+    ></model-viewer>
+  </div>
+  <script>
+    const thumbs = document.getElementById("thumbs");
+    const viewer = document.getElementById("viewer");
+    fetch("/frames.json")
+      .then((r) => r.ok ? r.json() : { frames: [] })
+      .then((data) => {
+        (data.frames || []).forEach((name) => {
+          const img = document.createElement("img");
+          img.src = "/frames/" + encodeURIComponent(name);
+          img.alt = name;
+          thumbs.appendChild(img);
+        });
+      })
+      .catch(() => {});
+    document.getElementById("file").addEventListener("change", (ev) => {
+      const file = ev.target.files && ev.target.files[0];
+      if (!file) return;
+      viewer.src = URL.createObjectURL(file);
+    });
+  </script>
+</body>
+</html>

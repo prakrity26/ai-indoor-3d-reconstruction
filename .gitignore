@@ -75,3 +75,14 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Small sample outputs for GitHub / mentor review (keep after *.glb / *.ply rules)
+!samples/
+!samples/**/
+!samples/**/*.glb
+!samples/**/*.ply
+!samples/**/*.jpg
+!samples/**/*.jpeg
+!samples/**/*.png
+!samples/**/*.json
+!samples/**/*.md
