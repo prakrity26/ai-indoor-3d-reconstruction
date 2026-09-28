@@ -1,4 +1,4 @@
-# Work so far (mentor log)
+# Work so far
 
 Internship project: indoor 3D reconstruction from a monocular phone video.  
 GitHub: https://github.com/prakrity26/ai-indoor-3d-reconstruction  
