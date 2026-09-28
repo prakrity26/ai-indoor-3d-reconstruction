@@ -4,9 +4,9 @@ A modular system for 3D scene reconstruction and spatial understanding from mono
 
 This repository is an internship engineering project. The reconstruction engine is designed as a reusable module that a company application can call through a REST API, without depending on the Streamlit UI or on internal pipeline details.
 
-**Current status:** Phases 1–7 are implemented (video → frames → pose → depth → cloud → mesh). Sample mesh outputs are in [`samples/`](samples/README.md). A walkable Gaussian splat for a second clip (`img7916`) is trained on Colab and is not stored in git until the PLY is saved. No object detection, API, or Streamlit product UI yet.
+**Current status:** Phases 1–7 are implemented (video → frames → pose → depth → cloud → mesh). Sample mesh outputs are in [`samples/img7916/`](samples/README.md) from clip `IMG_7916`. A walkable Gaussian splat for the same clip is trained on Colab and is not stored in git until the PLY is saved. No object detection, API, or Streamlit product UI yet.
 
-## For mentor review
+## Review
 
 GitHub account: **[prakrity26](https://github.com/prakrity26)**  
 Repository: **https://github.com/prakrity26/ai-indoor-3d-reconstruction**  
@@ -15,9 +15,9 @@ Progress log: **[PROGRESS.md](PROGRESS.md)** (work through Phases 1–7). Sample
 | What to look at | Where |
 |-----------------|--------|
 | Code through week 05 / Phases 1–7 | `model/` (preprocessing → mesh) |
-| Mesh output (orbit) | `samples/room20260814/mesh.glb` |
-| Filtered point cloud | `samples/room20260814/cloud_filtered.ply` |
-| How to open the mesh | `python -m ui.demo --job-id room20260814` |
+| Mesh output (orbit) | `samples/img7916/mesh.glb` |
+| Filtered point cloud | `samples/img7916/cloud_filtered.ply` |
+| How to open the mesh | `python -m ui.demo --job-id img7916` |
 | Optional splat training | `notebooks/colab_gaussian_splat.ipynb` then `python -m ui.splat_demo` |
 
 After clone:
@@ -26,7 +26,7 @@ After clone:
 python3.10 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
-python -m ui.demo --job-id room20260814
+python -m ui.demo --job-id img7916
 ```
 
 That serves **http://127.0.0.1:8765/** from the checked-in sample GLB. Internet is needed once for the viewer library.
@@ -37,7 +37,7 @@ The indoor clip is already reconstructed. Do **not** re-train splat on stage.
 
 ```bash
 # from the project root, with the venv active
-python -m ui.demo --job-id room20260814
+python -m ui.demo --job-id img7916
 ```
 
 Show: selected frames on the left, orbitable GLB on the right. Say: relative scale, estimated mesh, API still remaining.
@@ -45,7 +45,7 @@ Show: selected frames on the left, orbitable GLB on the right. Say: relative sca
 To rebuild only the mesh from the existing filtered cloud (optional, needs `.[cloud]`):
 
 ```bash
-python -m model.mesh data/frames/room20260814
+python -m model.mesh data/frames/img7916
 ```
 
 

@@ -10,12 +10,12 @@ This package will later upload video, poll job status, and embed an interactive 
 Until Phase 13, use the local preview of an **already reconstructed** job (does not run the engine):
 
 ```bash
-python -m ui.demo --job-id room20260814
+python -m ui.demo --job-id img7916
 ```
 
 That opens a browser with selected frames and `mesh.glb`. Orbit with the mouse. Internet is needed once so the 3D viewer library can load.
 
-If the browser is empty, drag `samples/room20260814/mesh.glb` (or `data/outputs/room20260814/mesh.glb`) onto the file input on the page.
+If the browser is empty, drag `samples/img7916/mesh.glb` onto the file input on the page.
 
 Walkable splat (needs `point_cloud.ply` from Colab):
 

@@ -1,11 +1,14 @@
 {
-  "job_id": "room20260814",
+  "job_id": "img7916",
   "pipeline": "phases_1_to_7_mesh",
   "strategy": "open3d_poisson",
-  "filtered_cloud_points": 160666,
-  "vertex_count": 12022,
-  "triangle_count": 23743,
+  "posed_keyframes": 17,
+  "selected_keyframes": 70,
+  "filtered_cloud_points": 80032,
+  "vertex_count": 17187,
+  "triangle_count": 34213,
   "scale": "relative_monocular",
+  "source_video": "IMG_7916",
   "files": {
     "mesh_glb": "mesh.glb",
     "mesh_ply": "mesh.ply",

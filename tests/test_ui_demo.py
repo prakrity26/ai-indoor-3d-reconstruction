@@ -21,6 +21,6 @@ def test_find_ply_none_when_missing(tmp_path: Path, monkeypatch) -> None:
 
 
 def test_sample_mesh_is_present() -> None:
-    glb = Path("samples/room20260814/mesh.glb")
+    glb = Path("samples/img7916/mesh.glb")
     assert glb.is_file()
     assert glb.stat().st_size > 1000

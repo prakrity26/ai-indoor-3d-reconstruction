@@ -102,7 +102,7 @@ def make_handler(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Open a local mid-defense mesh preview.")
-    parser.add_argument("--job-id", default="room20260814")
+    parser.add_argument("--job-id", default="img7916")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--no-browser", action="store_true")
