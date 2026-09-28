@@ -1,6 +1,6 @@
 # Sample reconstruction outputs
 
-These files are the **checked-in demo artifacts** for mentor review. Runtime jobs under `data/` stay gitignored (videos, full frame dumps, Colab splats).
+These files are stored with **Git LFS**. After clone, run `git lfs install` (or `git lfs pull`) if the GLB/PLY files are tiny pointer text instead of 3D binaries.
 
 ## Job `room20260814`
 

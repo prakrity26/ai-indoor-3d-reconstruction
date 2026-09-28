@@ -9,7 +9,8 @@ This repository is an internship engineering project. The reconstruction engine 
 ## For mentor review
 
 GitHub account: **[prakrity26](https://github.com/prakrity26)**  
-Repository: **https://github.com/prakrity26/ai-indoor-3d-reconstruction**
+Repository: **https://github.com/prakrity26/ai-indoor-3d-reconstruction**  
+Progress log: **[PROGRESS.md](PROGRESS.md)** (work through Phases 1–7). Sample 3D files use **Git LFS**.
 
 | What to look at | Where |
 |-----------------|--------|
