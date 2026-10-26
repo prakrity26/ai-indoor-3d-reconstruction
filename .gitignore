@@ -33,6 +33,8 @@ data/frames/*
 !data/frames/.gitkeep
 data/outputs/*
 !data/outputs/.gitkeep
+data/jobs/*
+!data/jobs/.gitkeep
 
 # Model weights and large artifacts
 *.pt

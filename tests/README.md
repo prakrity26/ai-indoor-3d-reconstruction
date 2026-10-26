@@ -16,6 +16,10 @@ Phase 6: `test_pointcloud.py` crops flyers and, with Open3D installed, statistic
 
 Phase 7: `test_mesh.py` rejects a missing filtered cloud and, with Open3D installed, Poisson-meshes a synthetic sphere to PLY and GLB.
 
+Phase 8: `test_scene.py` places one box through depth and pose. `test_scene_understanding.py` also drops low confidence, merges nearby objects, and caps the frame count. The YOLO weights are not downloaded.
+
+Phase 9: `test_evaluation.py` scores pose coverage, cloud and mesh counts, timings, and keeps a small splat marked sparse.
+
 Splat path: `test_splat.py` prepares overlapping JPEGs in this repo and checks COLMAP TXT parsing. Training is CUDA-only (Colab) and is not run in pytest.
 
 ```bash

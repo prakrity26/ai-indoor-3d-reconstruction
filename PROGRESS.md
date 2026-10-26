@@ -13,7 +13,9 @@ This file is the public progress note. Detailed daily/weekly notes stay in the l
 | Phases 0–7 (video → frames → pose → depth → cloud → mesh) | Done and on GitHub |
 | Sample mesh + filtered cloud | `samples/img7916/` (Git LFS), from clip `IMG_7916` |
 | Walkable Gaussian splat (`IMG_7916`) | Training on Colab GPU; PLY not in the repo yet |
-| Phases 8–16 (detection, API, database, queue, Streamlit) | Not started |
+| Phase 8 object labels (`scene.json`) | Done locally; YOLO weights are an optional extra |
+| Phase 9 evaluation (`evaluation.json`) | Done locally; scores the files already on disk |
+| Phases 10–16 (API, database, queue, Streamlit, Docker, docs) | Not started |
 
 ## What the sample output is
 
@@ -41,10 +43,11 @@ Opens http://127.0.0.1:8765/ — drag to orbit.
 | 2026-09-15 | Phase 6 statistical filter + voxel fusion |
 | 2026-09-17 | Phase 7 Poisson mesh (GLB/PLY); splat training path in this same repo |
 | 2026-09-28 | Sample mesh on GitHub from `IMG_7916`; local mesh/splat viewers; Colab splat PLY still pending |
+| 2026-10-26 | Phase 8 indoor object labels (`scene.json`); Phase 9 evaluation JSON for an existing job |
 
-## Pipeline (Phases 1–7)
+## Pipeline (Phases 1–9)
 
-Indoor video → extracted frames → selected keyframes → relative camera poses → monocular depth → back-projected point cloud → filtered/fused cloud → Poisson mesh (`mesh.glb` / `mesh.ply`).
+Indoor video → extracted frames → selected keyframes → relative camera poses → monocular depth → back-projected point cloud → filtered/fused cloud → Poisson mesh (`mesh.glb` / `mesh.ply`) → object labels (`scene.json`) → evaluation (`evaluation.json`).
 
 Scale is **relative** (not metric). The mesh can look incomplete or ballooned. That is expected for this stage.
 

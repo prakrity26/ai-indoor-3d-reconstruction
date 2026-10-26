@@ -1,15 +1,16 @@
 # api
 
-FastAPI service. This is the integration surface for company applications and for the Streamlit UI.
+FastAPI service. A later UI calls only this package. It does not import `model/` and it does not train.
 
-**Phase:** 10  
-**Status:** placeholder
+**Status:** upload and job status
 
-Intended responsibilities:
+- `POST /jobs` saves one indoor video and returns a queued job. The job name is the file name.
+- `GET /jobs/{job_id}` returns `queued`, `running`, `succeeded`, or `failed`.
+- `GET /jobs/{job_id}/point_cloud.ply` returns the walkable splat after the GPU worker finishes.
 
-- Video upload and validation at the HTTP boundary
-- Create reconstruction jobs
-- Return job status and artifact URLs
-- Never run the reconstruction engine in a request handler
+```bash
+pip install -e ".[api]"
+python -m api
+```
 
-No routes are implemented in Phase 0.
+The NVIDIA worker is separate: `python -m queue.workers`.

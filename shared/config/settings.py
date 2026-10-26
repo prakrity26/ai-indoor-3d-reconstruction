@@ -356,6 +356,8 @@ class SplatSettings:
     image_max_size: int
     colmap_bin: str
     train_steps: int
+    densify_every: int
+    max_gaussians: int
     output_dir: Path
 
     @classmethod
@@ -365,7 +367,9 @@ class SplatSettings:
             max_frames=_int("SPLAT_MAX_FRAMES", 80),
             image_max_size=_int("SPLAT_IMAGE_MAX_SIZE", 1280),
             colmap_bin=os.environ.get("SPLAT_COLMAP_BIN", "colmap").strip() or "colmap",
-            train_steps=_int("SPLAT_TRAIN_STEPS", 800),
+            train_steps=_int("SPLAT_TRAIN_STEPS", 30000),
+            densify_every=_int("SPLAT_DENSIFY_EVERY", 100),
+            max_gaussians=_int("SPLAT_MAX_GAUSSIANS", 800000),
             output_dir=Path(os.environ.get("OUTPUT_DIR", "./data/outputs")),
         )
 
@@ -378,9 +382,48 @@ class SplatSettings:
             raise ValueError("SPLAT_IMAGE_MAX_SIZE must be >= 256")
         if self.train_steps < 100:
             raise ValueError("SPLAT_TRAIN_STEPS must be >= 100")
+        if self.densify_every < 0:
+            raise ValueError("SPLAT_DENSIFY_EVERY must be >= 0")
+        if self.max_gaussians < 32:
+            raise ValueError("SPLAT_MAX_GAUSSIANS must be >= 32")
 
 
 def load_splat_settings() -> SplatSettings:
     settings = SplatSettings.from_env()
+    settings.validate()
+    return settings
+
+
+@dataclass(frozen=True)
+class SceneSettings:
+    confidence: float
+    max_frames: int
+    model_name: str
+    merge_distance: float
+    device: str = "cpu"
+
+    @classmethod
+    def from_env(cls) -> SceneSettings:
+        return cls(
+            confidence=_float("SCENE_CONFIDENCE", 0.35),
+            max_frames=_int("SCENE_MAX_FRAMES", 40),
+            model_name=os.environ.get("SCENE_MODEL", "yolov8n.pt").strip() or "yolov8n.pt",
+            merge_distance=_float("SCENE_MERGE_DISTANCE", 0.6),
+            device=os.environ.get("SCENE_DEVICE", "cpu").strip().lower() or "cpu",
+        )
+
+    def validate(self) -> None:
+        if not 0.0 < self.confidence <= 1.0:
+            raise ValueError("SCENE_CONFIDENCE must be in (0, 1]")
+        if self.max_frames < 1:
+            raise ValueError("SCENE_MAX_FRAMES must be >= 1")
+        if self.merge_distance <= 0:
+            raise ValueError("SCENE_MERGE_DISTANCE must be > 0")
+        if self.device not in {"cpu", "mps", "cuda"}:
+            raise ValueError("SCENE_DEVICE must be cpu, mps, or cuda")
+
+
+def load_scene_settings() -> SceneSettings:
+    settings = SceneSettings.from_env()
     settings.validate()
     return settings

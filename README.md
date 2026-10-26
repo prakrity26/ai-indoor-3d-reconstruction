@@ -4,7 +4,7 @@ A modular system for 3D scene reconstruction and spatial understanding from mono
 
 This repository is an internship engineering project. The reconstruction engine is designed as a reusable module that a company application can call through a REST API, without depending on the Streamlit UI or on internal pipeline details.
 
-**Current status:** Phases 1–7 are implemented (video → frames → pose → depth → cloud → mesh). Sample mesh outputs are in [`samples/img7916/`](samples/README.md) from clip `IMG_7916`. A walkable Gaussian splat for the same clip is trained on Colab and is not stored in git until the PLY is saved. No object detection, API, or Streamlit product UI yet.
+**Current status:** Phases 1–9 are implemented (video → frames → pose → depth → cloud → mesh → object labels → evaluation). Sample mesh outputs are in [`samples/img7916/`](samples/README.md) from clip `IMG_7916`. A walkable Gaussian splat for the same clip is trained on Colab and is not stored in git until the PLY is saved. API, database, queue, and the Streamlit product UI are still ahead.
 
 ## Review
 
@@ -131,8 +131,8 @@ Work proceeds **one phase at a time**. Do not start the next phase until the cur
 | 5 | 3D point-cloud generation | done |
 | 6 | Point-cloud filtering and fusion | done |
 | 7 | Mesh reconstruction and GLB/PLY export | implemented |
-| 8 | Object detection and scene understanding |
-| 9 | Evaluation and benchmarking |
+| 8 | Object detection and scene understanding | done |
+| 9 | Evaluation and benchmarking | done |
 | 10 | FastAPI service |
 | 11 | Database |
 | 12 | Queue and asynchronous workers |
@@ -169,9 +169,11 @@ python -m model.depth data/frames/<job_id>
 python -m model.reconstruction data/frames/<job_id>
 python -m model.pointcloud data/frames/<job_id>
 python -m model.mesh data/frames/<job_id>
+python -m model.scene_understanding data/frames/<job_id>
+python -m model.evaluation data/frames/<job_id>
 ```
 
-Phase 4 needs `.[depth]`. Phases 6–7 need `.[cloud]` (Open3D). `mesh.glb` is the laptop fallback. For a Captures-like walkable splat, use **this repo** on Colab:
+Phase 4 needs `.[depth]`. Phases 6–7 need `.[cloud]` (Open3D). Phase 8 needs `.[detect]` for YOLOv8n; tests pass a local detector and do not download weights. `mesh.glb` is the laptop fallback. For a Captures-like walkable splat, use **this repo** on Colab:
 
 ```bash
 # Mac: extract overlapping frames only

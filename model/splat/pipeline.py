@@ -68,11 +68,35 @@ def reconstruct_gaussian_splat(
             )
         )
     else:
-        colmap_txt = run_colmap(image_dir, job_dir / "splat" / "colmap", binary=settings.colmap_bin)
+        print(f"frames {image_count} from {image_dir}", flush=True)
+        colmap_txt, image_dir = run_colmap(image_dir, job_dir / "splat" / "colmap", binary=settings.colmap_bin)
         colmap_dir = str(colmap_txt.resolve())
         from model.splat.colmap_txt import load_colmap_txt
 
         registered = len(load_colmap_txt(colmap_txt)["images"])
+        print(f"COLMAP registered {registered} of {image_count}", flush=True)
+        if registered < 12:
+            raise SplatError(
+                "camera_path_too_short",
+                (
+                    f"COLMAP locked {registered} of {image_count} frames. "
+                    "Training this path rebuilds the same sparse cloud. "
+                    "Film a slower walk so most frames overlap, then rerun."
+                ),
+                {"registered": registered, "images": image_count},
+            )
+        if image_count and registered < int(image_count * 0.5):
+            warnings.append(
+                SplatIssue(
+                    "warning",
+                    "short_camera_path",
+                    (
+                        f"Only {registered} of {image_count} frames locked. "
+                        "The walk will cover that portion of the room. "
+                        "A full-room result needs a slower clip where most frames register."
+                    ),
+                )
+            )
         ply = job_dir / "splat" / "point_cloud.ply"
         train_gsplat(image_dir, colmap_txt, ply, settings)
         ply_path = str(ply.resolve())

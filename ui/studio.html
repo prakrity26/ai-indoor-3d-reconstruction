@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Indoor scenes</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; font-family: system-ui, sans-serif; background: #0b0d12; color: #eee; }
+    main { max-width: 40rem; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+    h1 { font-size: 1.4rem; font-weight: 650; margin: 0 0 0.4rem; }
+    p { line-height: 1.45; color: #c8cdd8; }
+    form { display: flex; gap: 0.6rem; align-items: center; margin: 1.2rem 0; }
+    button, .walk { background: #e8eefc; color: #111; border: 0; border-radius: 8px; padding: 0.55rem 0.9rem; font: inherit; cursor: pointer; text-decoration: none; }
+    button:disabled { opacity: 0.5; cursor: default; }
+    ul { list-style: none; padding: 0; margin: 0; }
+    li { display: flex; justify-content: space-between; gap: 1rem; align-items: center; padding: 0.85rem 0; border-top: 1px solid #242833; }
+    .meta { color: #9aa3b5; font-size: 0.92rem; }
+    .err { color: #ffb4b4; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Indoor scenes</h1>
+    <p>Upload one indoor video. It becomes its own scene. The next video does the same thing. Training runs on the GPU worker, then Walk opens that room.</p>
+    <form id="upload">
+      <input id="file" name="file" type="file" accept=".mp4,.mov,.avi,.mkv,.webm,.m4v,video/*" required />
+      <button type="submit">Upload</button>
+    </form>
+    <p id="note" class="meta"></p>
+    <ul id="jobs"></ul>
+  </main>
+  <script>
+    const note = document.getElementById("note");
+    const list = document.getElementById("jobs");
+    const form = document.getElementById("upload");
+
+    function row(job) {
+      const item = document.createElement("li");
+      const text = document.createElement("div");
+      text.innerHTML = "<strong></strong><div class='meta'></div>";
+      text.querySelector("strong").textContent = job.filename;
+      const detail = text.querySelector(".meta");
+      detail.textContent = job.job_id + " · " + job.status;
+      if (job.error) {
+        const err = document.createElement("div");
+        err.className = "err";
+        err.textContent = job.error;
+        text.appendChild(err);
+      }
+      item.appendChild(text);
+      if (job.splat_url) {
+        const link = document.createElement("a");
+        link.className = "walk";
+        link.href = "/viewer?ply=" + encodeURIComponent(job.splat_url);
+        link.textContent = "Walk";
+        item.appendChild(link);
+      }
+      return item;
+    }
+
+    async function refresh() {
+      const response = await fetch("/jobs");
+      const body = await response.json();
+      list.replaceChildren(...body.jobs.map(row));
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const button = form.querySelector("button");
+      button.disabled = true;
+      note.textContent = "Saving the video…";
+      const response = await fetch("/jobs", { method: "POST", body: new FormData(form) });
+      const body = await response.json();
+      button.disabled = false;
+      form.reset();
+      if (!response.ok) {
+        note.textContent = body.detail || "Upload failed.";
+        return;
+      }
+      note.textContent = body.filename + " is queued as " + body.job_id + ". The GPU worker trains this file next.";
+      refresh();
+    });
+
+    refresh();
+    setInterval(refresh, 4000);
+  </script>
+</body>
+</html>

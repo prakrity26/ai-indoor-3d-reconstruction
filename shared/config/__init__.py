@@ -1,1 +1,1 @@
-"""Shared configuration (Phases 1–7 plus the Gaussian splat path)."""
+"""Shared configuration (Phases 1–8 plus the Gaussian splat path)."""

@@ -39,6 +39,7 @@ def main(argv: list[str] | None = None) -> int:
             prepare_only=args.prepare_only,
         )
     except SplatError as exc:
+        print(f"ERROR {exc.code}: {exc.message}", flush=True)
         print(json.dumps({"ok": False, "error": exc.to_dict()}, indent=2))
         return 1
 
