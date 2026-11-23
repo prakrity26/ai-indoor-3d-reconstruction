@@ -169,7 +169,7 @@
       const fwd = new THREE.Vector3(); fwd.setComponent(long, 1);
       setBasis(up, fwd);
       UP.copy(up);
-      yaw = 0; pitch = -0.08;
+      yaw = mostDetailedYaw(new THREE.Vector3(...eye), axis, ext[axis], extent); pitch = -0.08;
       speed = Math.max(0.3, extent * 0.22);
       const cam = viewer.camera;
       cam.near = Math.max(0.01, extent / 600);
@@ -182,6 +182,36 @@
       if (orbit) { orbit.target.copy(home.center); }
       return resolvedUp;
     }
+    // Open facing the most detailed part of the room (furniture, windows) rather than a blank
+    // wall: around the eye, score 24 horizontal directions by the brightness variation of the
+    // solid splats at room distance, smooth over neighbours, and face the best one.
+    function mostDetailedYaw(eye, axis, height, extent) {
+      const count = viewer.splatMesh.getSplatCount();
+      const centers = new Float32Array(count * 3);
+      const colors = new Uint8Array(count * 4);
+      viewer.splatMesh.fillSplatDataArrays(null, null, null, centers, colors, null, true);
+      const SECTORS = 24;
+      const n = new Float64Array(SECTORS), sum = new Float64Array(SECTORS), sq = new Float64Array(SECTORS);
+      const p = new THREE.Vector3(), flat = new THREE.Vector3();
+      const step = Math.max(1, Math.floor(count / 300000));
+      for (let i = 0; i < count; i += step) {
+        if (colors[i * 4 + 3] < 60) continue; // skip faint floaters
+        p.set(centers[i * 3], centers[i * 3 + 1], centers[i * 3 + 2]).sub(eye);
+        if (Math.abs(p.getComponent(axis)) > height * 0.6) continue; // floor and ceiling
+        flat.copy(p).projectOnPlane(basis.up);
+        const d = flat.length();
+        if (d < extent * 0.05 || d > extent * 0.6) continue;
+        const angle = signedAngle(basis.fwd0, flat.normalize(), basis.up);
+        const s = Math.floor(((angle + Math.PI) / (2 * Math.PI)) * SECTORS) % SECTORS;
+        const luma = 0.299 * colors[i * 4] + 0.587 * colors[i * 4 + 1] + 0.114 * colors[i * 4 + 2];
+        n[s]++; sum[s] += luma; sq[s] += luma * luma;
+      }
+      const raw = Array.from(n, (k, s) => (k < 30 ? 0 : Math.sqrt(Math.max(0, sq[s] / k - (sum[s] / k) ** 2)) * Math.sqrt(k)));
+      const smooth = raw.map((_, s) => raw[(s + SECTORS - 1) % SECTORS] + 2 * raw[s] + raw[(s + 1) % SECTORS]);
+      const best = smooth.indexOf(Math.max(...smooth));
+      return Math.max(...smooth) > 0 ? ((best + 0.5) / SECTORS) * 2 * Math.PI - Math.PI : 0;
+    }
+
     function resetView() {
       if (!home) return;
       setMode("walk");
