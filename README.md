@@ -117,7 +117,8 @@ Details:
 
 - Trainer: Nerfstudio **splatfacto** by default (`--backend gsplat` uses the in-repo trainer).
 - A Colab disconnect is detected after `SPLAT_STALE_MINUTES` (default 20) without progress; press **Train again**.
-- With `SPLAT_KEEP_ROOT` set (the notebook uses Google Drive), each splat is also copied there before upload.
+- With `SPLAT_KEEP_ROOT` set (the notebook uses Google Drive), camera poses and training checkpoints are kept there, so a reconnected worker skips COLMAP and resumes training from the last checkpoint. Each finished splat is also copied there before upload.
+- Frames are shrunk to `SPLAT_MAX_SIDE` (default 1600 px) before COLMAP, which runs on the CPU on Colab; full-size 4K frames made feature extraction alone take ~27 minutes.
 - On a CUDA machine that shares the database, skip the gateway: `python -m queue.workers --pipeline splat`.
 - Docker: `docker compose --profile gpu up -d worker-gateway` runs the gateway (set `WORKER_TOKEN` in `.env`).
 - Filming matters most: a slow, overlapping walk (three loops at different heights) gives a far better splat than a fast pan.

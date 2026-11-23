@@ -33,7 +33,7 @@ class JobGone(Exception):
 
 class SplatQueue(Protocol):
     def claim(self) -> dict[str, Any] | None: ...
-    def fetch_source(self, job: dict[str, Any], target_dir: Path) -> Path: ...
+    def fetch_source(self, job: dict[str, Any], target_dir: Path, on_progress: Callable[[float], None] | None = None) -> Path: ...
     def progress(self, job_id: str, stage: str, percent: int) -> None: ...
     def deliver(self, job_id: str, ply: Path) -> None: ...
     def fail(self, job_id: str, message: str) -> None: ...
@@ -49,7 +49,7 @@ class LocalSplatQueue:
     def claim(self) -> dict[str, Any] | None:
         return self.store.claim_next_splat(self.worker)
 
-    def fetch_source(self, job: dict[str, Any], target_dir: Path) -> Path:
+    def fetch_source(self, job: dict[str, Any], target_dir: Path, on_progress: Callable[[float], None] | None = None) -> Path:
         return Path(job["source_path"])
 
     def progress(self, job_id: str, stage: str, percent: int) -> None:
@@ -95,18 +95,23 @@ class GatewaySplatQueue:
         response.raise_for_status()
         return response.json()
 
-    def fetch_source(self, job: dict[str, Any], target_dir: Path) -> Path:
+    def fetch_source(self, job: dict[str, Any], target_dir: Path, on_progress: Callable[[float], None] | None = None) -> Path:
         target_dir.mkdir(parents=True, exist_ok=True)
         target = target_dir / f"source{job.get('source_suffix') or '.mp4'}"
+        total = int(job.get("source_bytes") or 0)
         for attempt in range(4):
             try:
                 with self.http.stream("GET", f"{self.base}/worker/jobs/{job['job_id']}/source") as response:
                     if response.status_code == 409:
                         raise JobGone(job["job_id"])
                     response.raise_for_status()
+                    done = 0
                     with target.open("wb") as out:
                         for chunk in response.iter_bytes(1024 * 1024):
                             out.write(chunk)
+                            done += len(chunk)
+                            if on_progress is not None and total:
+                                on_progress(min(1.0, done / total))
                 return target
             except JobGone:
                 raise
@@ -232,13 +237,16 @@ def process_one(queue: SplatQueue, trainer: Trainer, work_root: Path) -> bool:
     try:
         with _Reporter(queue, job_id, cancel) as report:
             report("Downloading video", 1)
-            video = queue.fetch_source(job, work)
+            video = queue.fetch_source(
+                job, work, on_progress=lambda fraction: report(f"Downloading video · {int(fraction * 100)}%", 1)
+            )
             ply = trainer(video, work, report=report, cancel=cancel)
             if cancel.is_set():
                 raise JobGone(job_id)
             report("Uploading splat", 99)
             _keep_copy(job_id, Path(ply))
             queue.deliver(job_id, Path(ply))
+        _clear_resume(job_id)
         log.info("splat %s: delivered in %.0f min", job_id, (time.monotonic() - started) / 60)
     except JobGone:
         log.warning("splat %s: abandoned (no longer running on the server)", job_id)
@@ -269,6 +277,19 @@ def _keep_copy(job_id: str, ply: Path) -> None:
         log.warning("could not keep a copy: %s", exc)
 
 
+def resume_dir(job_id: str) -> Path | None:
+    """Where poses and checkpoints survive a Colab disconnect (inside SPLAT_KEEP_ROOT)."""
+    root = os.environ.get("SPLAT_KEEP_ROOT", "").strip()
+    return Path(root) / job_id / "resume" if root else None
+
+
+def _clear_resume(job_id: str) -> None:
+    folder = resume_dir(job_id)
+    if folder is not None and folder.is_dir():
+        shutil.rmtree(folder, ignore_errors=True)
+        log.info("cleared resume data in %s", folder)
+
+
 def run(queue: SplatQueue, trainer: Trainer, work_root: Path, *, once: bool = False, poll_seconds: float = 15.0) -> None:
     while True:
         if process_one(queue, trainer, work_root):
@@ -282,7 +303,8 @@ def run(queue: SplatQueue, trainer: Trainer, work_root: Path, *, once: bool = Fa
 def splatfacto_trainer(video: Path, work: Path, *, report, cancel) -> Path:
     from model.splat.splatfacto import train_splatfacto
 
-    return train_splatfacto(video, work, report=report, cancel=cancel)
+    # work is <work_root>/<job_id>; keep poses and checkpoints on Drive when configured.
+    return train_splatfacto(video, work, report=report, cancel=cancel, persist_dir=resume_dir(work.name))
 
 
 def gsplat_trainer(video: Path, work: Path, *, report, cancel) -> Path:

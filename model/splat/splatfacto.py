@@ -3,9 +3,18 @@
 The in-repo gsplat loop (``model.splat.train``) produced sparse ~1 MB clouds on phone video;
 splatfacto is the standard phone-video recipe and is what the IMG_7916 notebook moved to.
 
-    ns-process-data video  → COLMAP poses + downscaled frames
+    ffmpeg                 → ~180 evenly spaced frames, long side ≤ SPLAT_MAX_SIDE (1600)
+    ns-process-data images → COLMAP poses
     ns-train splatfacto    → 3D Gaussians (progress parsed from its step table)
     ns-export gaussian-splat → splat.ply (3DGS layout, loads in the web viewer)
+
+Shrinking frames before COLMAP matters on Colab: its COLMAP runs on the CPU, and full-size
+4K phone frames made feature extraction alone take ~27 minutes. Training already uses
+downscaled images, so 1600 px loses nothing visible.
+
+With ``persist_dir`` (the worker uses Google Drive on Colab), the COLMAP result and training
+checkpoints are kept there. A worker that reconnects after a Colab disconnect skips COLMAP and
+continues training from the last checkpoint instead of starting over.
 
 Needs a CUDA machine with ``pip install nerfstudio`` and ``apt-get install colmap ffmpeg``.
 """
@@ -13,6 +22,7 @@ Needs a CUDA machine with ``pip install nerfstudio`` and ``apt-get install colma
 from __future__ import annotations
 
 import glob
+import json
 import os
 import re
 import shutil
@@ -37,7 +47,8 @@ _EXPORT = (95, 99)
 
 
 def require_nerfstudio() -> None:
-    missing = [tool for tool in ("ns-process-data", "ns-train", "ns-export", "colmap", "ffmpeg") if shutil.which(tool) is None]
+    tools = ("ns-process-data", "ns-train", "ns-export", "colmap", "ffmpeg", "ffprobe")
+    missing = [tool for tool in tools if shutil.which(tool) is None]
     if missing:
         raise SplatError(
             "missing_dependency",
@@ -56,6 +67,8 @@ def train_splatfacto(
     frames: int | None = None,
     steps: int | None = None,
     min_bytes: int | None = None,
+    max_side: int | None = None,
+    persist_dir: str | Path | None = None,
 ) -> Path:
     """Train a splat from ``video``. Returns the exported PLY path."""
     require_nerfstudio()
@@ -64,33 +77,55 @@ def train_splatfacto(
     frames = frames or int(os.environ.get("SPLAT_NUM_FRAMES", "180"))
     steps = steps or int(os.environ.get("SPLAT_TRAIN_STEPS", "30000"))
     min_bytes = min_bytes if min_bytes is not None else int(os.environ.get("SPLAT_MIN_BYTES", "5000000"))
+    max_side = max_side or int(os.environ.get("SPLAT_MAX_SIDE", "1600"))
 
     work = Path(work_dir)
     data = work / "ns_data"
-    outputs = work / "ns_outputs"
     export = work / "ns_export"
-    for folder in (data, outputs, export):
+    for folder in (data, export, work / "frames"):
         shutil.rmtree(folder, ignore_errors=True)
+    persist = Path(persist_dir) if persist_dir else None
+    outputs = (persist / "ns_outputs") if persist else (work / "ns_outputs")
+    if not persist:
+        shutil.rmtree(outputs, ignore_errors=True)
     env = {**os.environ, "QT_QPA_PLATFORM": "offscreen"}
 
-    report("Estimating camera poses (COLMAP)", _PROCESS[0])
-    _run(
-        [
-            "ns-process-data", "video",
-            "--data", str(video),
-            "--output-dir", str(data),
-            "--num-frames-target", str(frames),
-            "--matching-method", "sequential",
-            # Colab's apt COLMAP has no CUDA build.
-            "--no-gpu",
-        ],
-        env=env,
-        cancel=cancel,
-        stage="Estimating camera poses (COLMAP)",
-    )
+    # ---- camera poses (or restore them) -------------------------------------------------------
+    fingerprint = {"video_bytes": Path(video).stat().st_size, "frames": frames, "max_side": max_side}
+    if persist and _can_resume(persist, fingerprint):
+        report("Restoring camera poses from Drive", _PROCESS[0])
+        shutil.copytree(persist / "ns_data", data)
+        print(f"resumed: camera poses from {persist / 'ns_data'}", flush=True)
+    else:
+        if persist:
+            shutil.rmtree(persist, ignore_errors=True)  # different video or settings: start clean
+            persist.mkdir(parents=True, exist_ok=True)
+        report("Extracting frames", _PROCESS[0])
+        frame_dir = work / "frames"
+        _extract_frames(Path(video), frame_dir, frames, max_side, env=env, cancel=cancel)
+        report("Estimating camera poses (COLMAP)", _PROCESS[0] + 1)
+        _run(
+            [
+                "ns-process-data", "images",
+                "--data", str(frame_dir),
+                "--output-dir", str(data),
+                "--matching-method", "sequential",
+                # Colab's apt COLMAP has no CUDA build.
+                "--no-gpu",
+            ],
+            env=env,
+            cancel=cancel,
+            stage="Estimating camera poses (COLMAP)",
+        )
+        shutil.rmtree(frame_dir, ignore_errors=True)
+        if persist:
+            report("Saving camera poses to Drive", _PROCESS[1] - 1)
+            shutil.copytree(data, persist / "ns_data", ignore=shutil.ignore_patterns("database.db"))
+            (persist / "fingerprint.json").write_text(json.dumps(fingerprint))
     registered = len(list((data / "images").glob("*"))) if (data / "images").is_dir() else 0
     report(f"Poses ready ({registered} frames)", _PROCESS[1])
 
+    # ---- training (resuming from the last checkpoint when there is one) -----------------------
     def on_line(line: str) -> None:
         match = _STEP_ROW.match(line)
         if match:
@@ -98,19 +133,19 @@ def train_splatfacto(
             low, high = _TRAIN
             report(f"Training Gaussians · step {match.group(1)}/{steps}", int(low + (high - low) * done / 100))
 
-    _run(
-        [
-            "ns-train", "splatfacto",
-            "--data", str(data),
-            "--output-dir", str(outputs),
-            "--max-num-iterations", str(steps),
-            "--viewer.quit-on-train-completion", "True",
-        ],
-        env=env,
-        cancel=cancel,
-        stage="Training Gaussians",
-        on_line=on_line,
-    )
+    command = [
+        "ns-train", "splatfacto",
+        "--data", str(data),
+        "--output-dir", str(outputs),
+        "--max-num-iterations", str(steps),
+        "--viewer.quit-on-train-completion", "True",
+    ]
+    checkpoints = latest_checkpoint_dir(outputs)
+    if checkpoints is not None:
+        command += ["--load-dir", str(checkpoints)]
+        report("Resuming training from the last checkpoint", _TRAIN[0])
+        print(f"resumed: training from {checkpoints}", flush=True)
+    _run(command, env=env, cancel=cancel, stage="Training Gaussians", on_line=on_line)
 
     configs = sorted(glob.glob(str(outputs / "**" / "config.yml"), recursive=True), key=os.path.getmtime)
     if not configs:
@@ -136,6 +171,62 @@ def train_splatfacto(
         )
     report("Uploading splat", _EXPORT[1])
     return ply
+
+
+def latest_checkpoint_dir(outputs: Path) -> Path | None:
+    """The nerfstudio_models folder holding the newest step-*.ckpt under ``outputs``, if any."""
+    found = glob.glob(str(Path(outputs) / "**" / "nerfstudio_models" / "step-*.ckpt"), recursive=True)
+    if not found:
+        return None
+    return Path(max(found, key=_checkpoint_step)).parent
+
+
+def _checkpoint_step(path: str) -> int:
+    match = re.search(r"step-(\d+)\.ckpt$", path)
+    return int(match.group(1)) if match else -1
+
+
+def _can_resume(persist: Path, fingerprint: dict) -> bool:
+    try:
+        saved = json.loads((persist / "fingerprint.json").read_text())
+    except (OSError, ValueError):
+        return False
+    return saved == fingerprint and (persist / "ns_data" / "transforms.json").is_file()
+
+
+def _extract_frames(video: Path, out: Path, count: int, max_side: int, *, env: dict, cancel: threading.Event) -> None:
+    """``count`` evenly spaced JPEGs, long side at most ``max_side`` (never upscaled)."""
+    out.mkdir(parents=True, exist_ok=True)
+    duration = _duration_seconds(video, env)
+    rate = max(0.05, count / duration) if duration > 0 else 2.0
+    scale = f"scale='min({max_side},iw)':'min({max_side},ih)':force_original_aspect_ratio=decrease"
+    _run(
+        [
+            "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error",
+            "-i", str(video),
+            "-vf", f"fps={rate:.5f},{scale}",
+            "-q:v", "2",
+            str(out / "frame_%05d.jpg"),
+        ],
+        env=env,
+        cancel=cancel,
+        stage="Extracting frames",
+    )
+    extracted = len(list(out.glob("*.jpg")))
+    print(f"extracted {extracted} frames (long side ≤ {max_side}px)", flush=True)
+    if extracted < 8:
+        raise SplatError("too_few_frames", f"Only {extracted} frames could be read from the video.")
+
+
+def _duration_seconds(video: Path, env: dict) -> float:
+    try:
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(video)],
+            capture_output=True, text=True, env=env, timeout=60,
+        )
+        return float(result.stdout.strip())
+    except (ValueError, subprocess.SubprocessError, OSError):
+        return 0.0
 
 
 def _run(

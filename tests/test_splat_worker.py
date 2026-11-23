@@ -160,41 +160,112 @@ def test_local_queue_delivers_into_frames(rig) -> None:
 
 # ---- splatfacto runner with stand-in commands -----------------------------------------------
 
+_LOG = 'echo "$(basename "$0") $*" >> "$FAKE_LOG"\n'
+_ARG = 'out=""; prev=""; for a in "$@"; do [ "$prev" = "--output-dir" ] && out="$a"; prev="$a"; last="$a"; done\n'
 _FAKES = {
     "colmap": "exit 0",
-    "ffmpeg": "exit 0",
-    "ns-process-data": 'out=""; while [ $# -gt 0 ]; do [ "$1" = "--output-dir" ] && out="$2"; shift; done\n'
-    'mkdir -p "$out/images"; for i in 1 2 3; do echo x > "$out/images/f$i.png"; done; echo "poses done"',
-    "ns-train": 'out=""; while [ $# -gt 0 ]; do [ "$1" = "--output-dir" ] && out="$2"; shift; done\n'
-    'echo "Step (% Done)   Train Iter"; echo "  100 (10.00%)   3 ms"; echo "  900 (90.00%)   3 ms"\n'
-    'mkdir -p "$out/run/splatfacto/1"; echo cfg > "$out/run/splatfacto/1/config.yml"',
-    "ns-export": 'out=""; while [ $# -gt 0 ]; do [ "$1" = "--output-dir" ] && out="$2"; shift; done\n'
-    'mkdir -p "$out"; printf "ply\\n%0200d" 0 > "$out/splat.ply"',
+    "ffprobe": 'echo "60.0"',
+    "ffmpeg": _ARG + 'd=$(dirname "$last"); mkdir -p "$d"; for i in $(seq 1 12); do echo x > "$d/frame_$i.jpg"; done',
+    "ns-process-data": _ARG + 'mkdir -p "$out/images"; for i in 1 2 3; do echo x > "$out/images/f$i.png"; done\n'
+    'echo "{}" > "$out/transforms.json"; echo db > "$out/database.db"; echo "poses done"',
+    "ns-train": _ARG + 'echo "Step (% Done)   Train Iter"; echo "  100 (10.00%)   3 ms"; echo "  900 (90.00%)   3 ms"\n'
+    'run="$out/run/splatfacto/$(date +%s%N)"; mkdir -p "$run/nerfstudio_models"; echo cfg > "$run/config.yml"\n'
+    'echo ck > "$run/nerfstudio_models/step-000002000.ckpt"',
+    "ns-export": _ARG + 'mkdir -p "$out"; printf "ply\\n%0200d" 0 > "$out/splat.ply"',
 }
 
 
-def _fake_tools(folder: Path, monkeypatch: pytest.MonkeyPatch, fail: str = "") -> None:
+def _fake_tools(folder: Path, monkeypatch: pytest.MonkeyPatch, fail: str = "") -> Path:
     folder.mkdir()
     for name, body in _FAKES.items():
         script = folder / name
-        script.write_text("#!/bin/sh\n" + ("echo boom; exit 3" if name == fail else body) + "\n")
+        script.write_text("#!/bin/sh\n" + _LOG + ("echo boom; exit 3" if name == fail else body) + "\n")
         script.chmod(script.stat().st_mode | stat.S_IEXEC)
     monkeypatch.setenv("PATH", f"{folder}{os.pathsep}{os.environ['PATH']}")
+    log = folder.parent / "calls.log"
+    monkeypatch.setenv("FAKE_LOG", str(log))
+    return log
 
 
-def test_splatfacto_runs_the_three_steps_and_reports_progress(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def _video(tmp_path: Path, size: int = 1000) -> Path:
+    video = tmp_path / "v.mp4"
+    video.write_bytes(b"v" * size)
+    return video
+
+
+def test_splatfacto_runs_the_steps_and_reports_progress(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from model.splat.splatfacto import train_splatfacto
 
-    _fake_tools(tmp_path / "bin", monkeypatch)
+    log = _fake_tools(tmp_path / "bin", monkeypatch)
     reports: list[tuple[str, int]] = []
-    ply = train_splatfacto(tmp_path / "v.mp4", tmp_path / "work", report=lambda s, p: reports.append((s, p)), steps=1000, min_bytes=10)
+    ply = train_splatfacto(_video(tmp_path), tmp_path / "work", report=lambda s, p: reports.append((s, p)), steps=1000, min_bytes=10)
     assert ply.read_bytes().startswith(b"ply")
     stages = [stage for stage, _ in reports]
-    assert stages[0].startswith("Estimating camera poses")
+    assert stages[:2] == ["Extracting frames", "Estimating camera poses (COLMAP)"]
     assert "Poses ready (3 frames)" in stages
     assert ("Training Gaussians · step 100/1000", 23) in reports
     assert ("Training Gaussians · step 900/1000", 87) in reports
     assert [p for _, p in reports] == sorted(p for _, p in reports)  # monotonic
+    calls = log.read_text()
+    # 180 frames over a 60 s video → 3 fps, shrunk to a 1600 px long side, never upscaled.
+    assert "fps=3.00000,scale='min(1600,iw)':'min(1600,ih)':force_original_aspect_ratio=decrease" in calls
+    assert "ns-process-data images --data" in calls and "--no-gpu" in calls
+    assert "--load-dir" not in calls
+
+
+def test_splatfacto_resumes_poses_and_checkpoints_from_drive(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from model.splat.splatfacto import train_splatfacto
+
+    log = _fake_tools(tmp_path / "bin", monkeypatch)
+    drive = tmp_path / "drive" / "room" / "resume"
+    video = _video(tmp_path)
+    train_splatfacto(video, tmp_path / "work", persist_dir=drive, steps=1000, min_bytes=10)
+    assert (drive / "ns_data" / "transforms.json").is_file()
+    assert not (drive / "ns_data" / "database.db").exists()  # big COLMAP db is not copied to Drive
+    assert list(drive.glob("ns_outputs/**/step-*.ckpt"))
+
+    # Colab disconnects; a new worker gets the same job: no COLMAP, training continues.
+    log.write_text("")
+    reports: list[str] = []
+    train_splatfacto(video, tmp_path / "work2", persist_dir=drive, steps=1000, min_bytes=10, report=lambda s, p: reports.append(s))
+    calls = log.read_text()
+    assert "ffmpeg" not in calls and "ns-process-data" not in calls
+    assert "--load-dir" in calls and "nerfstudio_models" in calls
+    assert "Restoring camera poses from Drive" in reports
+    assert "Resuming training from the last checkpoint" in reports
+
+    # A different video for the same folder must not reuse the old poses.
+    log.write_text("")
+    train_splatfacto(_video(tmp_path, size=2000), tmp_path / "work3", persist_dir=drive, steps=1000, min_bytes=10)
+    calls = log.read_text()
+    assert "ns-process-data" in calls and "--load-dir" not in calls
+
+
+def test_resume_data_is_cleared_after_delivery_but_the_ply_copy_is_kept(rig, monkeypatch: pytest.MonkeyPatch) -> None:
+    store, api, gateway, tmp_path = rig
+    monkeypatch.setenv("SPLAT_KEEP_ROOT", str(tmp_path / "drive"))
+    job_id = _upload(api)
+    resume = splat_worker.resume_dir(job_id)
+    (resume / "ns_data").mkdir(parents=True)
+
+    def trainer(video, work, *, report, cancel):
+        out = work / "s.ply"
+        out.write_bytes(PLY)
+        return out
+
+    splat_worker.process_one(_queue(gateway), trainer, tmp_path / "work")
+    assert not resume.exists()
+    assert (tmp_path / "drive" / job_id / "point_cloud.ply").read_bytes() == PLY
+
+
+def test_download_reports_fractions(rig) -> None:
+    _, api, gateway, tmp_path = rig
+    _upload(api)
+    queue = _queue(gateway)
+    job = queue.claim()
+    fractions: list[float] = []
+    queue.fetch_source(job, tmp_path / "dl", on_progress=fractions.append)
+    assert fractions and fractions[-1] == 1.0
 
 
 def test_splatfacto_failures_are_clear(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -203,7 +274,7 @@ def test_splatfacto_failures_are_clear(tmp_path: Path, monkeypatch: pytest.Monke
 
     _fake_tools(tmp_path / "bin", monkeypatch, fail="ns-train")
     with pytest.raises(SplatError) as err:
-        train_splatfacto(tmp_path / "v.mp4", tmp_path / "work", min_bytes=10)
+        train_splatfacto(_video(tmp_path), tmp_path / "work", min_bytes=10)
     assert "Training Gaussians failed (exit 3)" in err.value.message and "boom" in err.value.message
 
 
@@ -213,7 +284,7 @@ def test_splatfacto_rejects_a_sparse_export(tmp_path: Path, monkeypatch: pytest.
 
     _fake_tools(tmp_path / "bin", monkeypatch)
     with pytest.raises(SplatError) as err:
-        train_splatfacto(tmp_path / "v.mp4", tmp_path / "work", min_bytes=10_000_000)
+        train_splatfacto(_video(tmp_path), tmp_path / "work", min_bytes=10_000_000)
     assert err.value.code == "sparse_splat"
 
 
@@ -226,7 +297,7 @@ def test_splatfacto_cancel_stops_the_command(tmp_path: Path, monkeypatch: pytest
     cancel = threading.Event()
     threading.Timer(0.5, cancel.set).start()
     with pytest.raises(SplatError) as err:
-        train_splatfacto(tmp_path / "v.mp4", tmp_path / "work", cancel=cancel, min_bytes=10)
+        train_splatfacto(_video(tmp_path), tmp_path / "work", cancel=cancel, min_bytes=10)
     assert err.value.code == "cancelled"
 
 
