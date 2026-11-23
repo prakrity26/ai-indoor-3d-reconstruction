@@ -66,3 +66,10 @@ def test_poisson_sphere_writes_ply_and_glb(tmp_path: Path) -> None:
     assert (tmp_path / "outputs" / "job" / "mesh.ply").is_file()
     assert (tmp_path / "outputs" / "job" / "mesh.glb").is_file()
     assert Path(result.glb_path).stat().st_size > 0
+
+
+def test_poisson_threads_defaults_to_one_and_rejects_zero(tmp_path: Path) -> None:
+    assert _settings(tmp_path).poisson_threads == 1
+    assert _settings(tmp_path, poisson_threads=-1).poisson_threads == -1
+    with pytest.raises(ValueError):
+        _settings(tmp_path, poisson_threads=0)

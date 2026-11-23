@@ -28,7 +28,7 @@ python -m model.mesh data/frames/<job_id>
 
 1. Load `cloud_filtered.ply`.
 2. Estimate and orient normals.
-3. Screened Poisson reconstruction (`MESH_POISSON_DEPTH`).
+3. Screened Poisson reconstruction (`MESH_POISSON_DEPTH`). Runs single-threaded by default (`MESH_POISSON_THREADS=1`) because Open3D 0.19's multi-threaded Poisson segfaults intermittently on macOS; set `-1` to let Open3D choose.
 4. Drop low-density vertices, crop to the cloud bounding box, optionally simplify.
 5. Copy nearby point colors onto vertices.
 6. Write `mesh.ply` and `mesh.glb`.

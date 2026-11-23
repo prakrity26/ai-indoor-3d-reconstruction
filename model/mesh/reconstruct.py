@@ -75,6 +75,7 @@ def poisson_from_points(
     mesh, densities = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(
         cloud,
         depth=settings.poisson_depth,
+        n_threads=settings.poisson_threads,
     )
     densities = np.asarray(densities)
     if densities.size and settings.density_quantile > 0:

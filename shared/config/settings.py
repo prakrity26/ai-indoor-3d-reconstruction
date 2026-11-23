@@ -308,6 +308,9 @@ class MeshSettings:
     max_triangles: int
     write_glb: bool
     output_dir: Path
+    # Open3D 0.19 Poisson segfaults intermittently when multi-threaded on macOS arm64.
+    # 1 is stable; -1 lets Open3D pick a thread count.
+    poisson_threads: int = 1
 
     @classmethod
     def from_env(cls) -> MeshSettings:
@@ -322,9 +325,12 @@ class MeshSettings:
             max_triangles=_int("MESH_MAX_TRIANGLES", 200000),
             write_glb=_bool("MESH_WRITE_GLB", True),
             output_dir=Path(os.environ.get("OUTPUT_DIR", "./data/outputs")),
+            poisson_threads=_int("MESH_POISSON_THREADS", 1),
         )
 
     def validate(self) -> None:
+        if self.poisson_threads == 0 or self.poisson_threads < -1:
+            raise ValueError("MESH_POISSON_THREADS must be -1 (auto) or >= 1")
         if self.poisson_depth < 5 or self.poisson_depth > 12:
             raise ValueError("MESH_POISSON_DEPTH must be in [5, 12]")
         if self.normal_radius <= 0:
