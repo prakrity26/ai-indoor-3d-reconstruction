@@ -291,8 +291,27 @@ def _clear_resume(job_id: str) -> None:
 
 
 def run(queue: SplatQueue, trainer: Trainer, work_root: Path, *, once: bool = False, poll_seconds: float = 15.0) -> None:
+    """Train queued splats forever. Survives the gateway being unreachable (laptop asleep,
+    tunnel restarting) by backing off and retrying instead of exiting."""
+    outages = 0
     while True:
-        if process_one(queue, trainer, work_root):
+        try:
+            worked = process_one(queue, trainer, work_root)
+            if outages:
+                log.info("gateway reachable again")
+            outages = 0
+        except Exception as exc:
+            outages += 1
+            wait = min(300.0, poll_seconds * outages)
+            log.warning(
+                "cannot reach the gateway (%s). Is the laptop awake and the tunnel running? "
+                "If the tunnel restarted, its URL changed: stop this cell and rerun cells 3 and 4. "
+                "Retrying in %.0f s.",
+                exc, wait,
+            )
+            time.sleep(wait)
+            continue
+        if worked:
             continue
         if once:
             return

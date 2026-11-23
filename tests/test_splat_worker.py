@@ -314,3 +314,34 @@ def test_gateway_and_worker_entry_points_restore_stdlib_queue() -> None:
     assert result.returncode == 0, result.stderr
     help_run = subprocess.run([sys.executable, "-m", "queue.workers", "--help"], capture_output=True, text=True, cwd=Path(__file__).parents[1])
     assert help_run.returncode == 0 and "--gateway" in help_run.stdout, help_run.stderr
+
+
+def test_worker_survives_an_unreachable_gateway(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """The laptop slept and the tunnel died: the worker must wait, not exit."""
+    sleeps: list[float] = []
+    monkeypatch.setattr(splat_worker.time, "sleep", sleeps.append)
+
+    class FlakyQueue:
+        calls = 0
+
+        def claim(self):
+            FlakyQueue.calls += 1
+            if FlakyQueue.calls <= 2:
+                raise ConnectionError("Name or service not known")
+            return None
+
+    splat_worker.run(FlakyQueue(), lambda *a, **k: None, tmp_path, once=True, poll_seconds=15)
+    assert FlakyQueue.calls == 3
+    assert sleeps == [15, 30]  # backed off, then carried on
+
+
+def test_gsplat_compile_is_limited_to_two_jobs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from model.splat.splatfacto import train_splatfacto
+
+    log = _fake_tools(tmp_path / "bin", monkeypatch)
+    monkeypatch.delenv("MAX_JOBS", raising=False)
+    (tmp_path / "bin" / "ns-train").write_text(
+        (tmp_path / "bin" / "ns-train").read_text().replace("#!/bin/sh\n", '#!/bin/sh\necho "MAX_JOBS=$MAX_JOBS" >> "$FAKE_LOG"\n', 1)
+    )
+    train_splatfacto(_video(tmp_path), tmp_path / "work", steps=1000, min_bytes=10)
+    assert "MAX_JOBS=2" in log.read_text()

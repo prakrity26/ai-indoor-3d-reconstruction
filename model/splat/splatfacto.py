@@ -89,6 +89,9 @@ def train_splatfacto(
     if not persist:
         shutil.rmtree(outputs, ignore_errors=True)
     env = {**os.environ, "QT_QPA_PLATFORM": "offscreen"}
+    # gsplat compiles its CUDA kernels on first use. Unlimited parallel nvcc jobs ran Colab out of
+    # memory (exit 137, "Killed"); two at a time fits in ~12 GB of RAM.
+    env.setdefault("MAX_JOBS", "2")
 
     # ---- camera poses (or restore them) -------------------------------------------------------
     fingerprint = {"video_bytes": Path(video).stat().st_size, "frames": frames, "max_side": max_side}

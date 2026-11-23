@@ -104,9 +104,13 @@ python -m api.worker_gateway                     # worker gateway on :8001
 cloudflared tunnel --url http://localhost:8001   # prints https://<random>.trycloudflare.com
 ```
 
+Keep the laptop **awake, lid open, and plugged in** until training finishes; if it sleeps, the
+tunnel dies. In a spare terminal: `caffeinate -dims`.
+
 **2. In Colab**, open [`notebooks/colab_gpu_worker.ipynb`](notebooks/colab_gpu_worker.ipynb)
 (File → Open notebook → GitHub → `prakrity26/ai-indoor-3d-reconstruction`), choose a GPU runtime,
-run the cells, and paste the tunnel URL and token when asked. Leave the last cell running.
+run the cells (cell 3b builds the CUDA kernels once per session, or restores them from Drive),
+and paste the tunnel URL and token when asked. Leave the last cell running.
 
 **3. Watch it**: Processing jobs and the project page show *Estimating camera poses → Training
 Gaussians · step N/30000 → Uploading*. On a T4, 30,000 steps take roughly 45–90 minutes. When it
