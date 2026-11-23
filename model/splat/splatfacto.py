@@ -125,8 +125,17 @@ def train_splatfacto(
             report("Saving camera poses to Drive", _PROCESS[1] - 1)
             shutil.copytree(data, persist / "ns_data", ignore=shutil.ignore_patterns("database.db"))
             (persist / "fingerprint.json").write_text(json.dumps(fingerprint))
-    registered = len(list((data / "images").glob("*"))) if (data / "images").is_dir() else 0
-    report(f"Poses ready ({registered} frames)", _PROCESS[1])
+    registered, sampled = _registration(data, frames)
+    report(f"Poses ready ({registered} of {sampled} frames)", _PROCESS[1])
+    min_ratio = float(os.environ.get("SPLAT_MIN_REGISTERED", "0.3"))
+    if sampled and registered < max(8, int(sampled * min_ratio)):
+        raise SplatError(
+            "camera_poses_failed",
+            f"COLMAP could place only {registered} of {sampled} frames in 3D, too few to train a splat. "
+            "This usually means fast motion or blur, blank walls, or too little overlap between views. "
+            "Film again more slowly, overlapping your path, with good light (see the capture tips).",
+            {"registered": registered, "sampled": sampled},
+        )
 
     # ---- training (resuming from the last checkpoint when there is one) -----------------------
     def on_line(line: str) -> None:
@@ -174,6 +183,17 @@ def train_splatfacto(
         )
     report("Uploading splat", _EXPORT[1])
     return ply
+
+
+def _registration(data: Path, sampled_target: int) -> tuple[int, int]:
+    """(frames COLMAP posed, frames that were sampled). transforms.json lists only posed frames."""
+    try:
+        posed = len(json.loads((data / "transforms.json").read_text()).get("frames") or [])
+    except (OSError, ValueError):
+        posed = 0
+    images = data / "images"
+    sampled = len([p for p in images.iterdir() if p.is_file()]) if images.is_dir() else 0
+    return posed, max(sampled, posed) or sampled_target
 
 
 def latest_checkpoint_dir(outputs: Path) -> Path | None:

@@ -166,8 +166,9 @@ _FAKES = {
     "colmap": "exit 0",
     "ffprobe": 'echo "60.0"',
     "ffmpeg": _ARG + 'd=$(dirname "$last"); mkdir -p "$d"; for i in $(seq 1 12); do echo x > "$d/frame_$i.jpg"; done',
-    "ns-process-data": _ARG + 'mkdir -p "$out/images"; for i in 1 2 3; do echo x > "$out/images/f$i.png"; done\n'
-    'echo "{}" > "$out/transforms.json"; echo db > "$out/database.db"; echo "poses done"',
+    "ns-process-data": _ARG + 'mkdir -p "$out/images"; n=${FAKE_POSED:-12}; for i in $(seq 1 12); do echo x > "$out/images/f$i.png"; done\n'
+    'frames=""; for i in $(seq 1 $n); do frames="$frames{\\"file_path\\": \\"images/f$i.png\\"},"; done\n'
+    'printf "{\\"frames\\": [%s]}" "${frames%,}" > "$out/transforms.json"; echo db > "$out/database.db"; echo "poses done"',
     "ns-train": _ARG + 'echo "Step (% Done)   Train Iter"; echo "  100 (10.00%)   3 ms"; echo "  900 (90.00%)   3 ms"\n'
     'run="$out/run/splatfacto/$(date +%s%N)"; mkdir -p "$run/nerfstudio_models"; echo cfg > "$run/config.yml"\n'
     'echo ck > "$run/nerfstudio_models/step-000002000.ckpt"',
@@ -202,7 +203,7 @@ def test_splatfacto_runs_the_steps_and_reports_progress(tmp_path: Path, monkeypa
     assert ply.read_bytes().startswith(b"ply")
     stages = [stage for stage, _ in reports]
     assert stages[:2] == ["Extracting frames", "Estimating camera poses (COLMAP)"]
-    assert "Poses ready (3 frames)" in stages
+    assert "Poses ready (12 of 12 frames)" in stages
     assert ("Training Gaussians · step 100/1000", 23) in reports
     assert ("Training Gaussians · step 900/1000", 87) in reports
     assert [p for _, p in reports] == sorted(p for _, p in reports)  # monotonic
@@ -345,3 +346,17 @@ def test_gsplat_compile_is_limited_to_two_jobs(tmp_path: Path, monkeypatch: pyte
     )
     train_splatfacto(_video(tmp_path), tmp_path / "work", steps=1000, min_bytes=10)
     assert "MAX_JOBS=2" in log.read_text()
+
+
+def test_splatfacto_stops_when_colmap_cannot_place_the_frames(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """IMG_7916's first run: COLMAP posed 2 of 181 frames and training ran anyway for nothing."""
+    from model.splat.exceptions import SplatError
+    from model.splat.splatfacto import train_splatfacto
+
+    log = _fake_tools(tmp_path / "bin", monkeypatch)
+    monkeypatch.setenv("FAKE_POSED", "2")
+    with pytest.raises(SplatError) as err:
+        train_splatfacto(_video(tmp_path), tmp_path / "work", steps=1000, min_bytes=10)
+    assert err.value.code == "camera_poses_failed"
+    assert "only 2 of 12 frames" in err.value.message
+    assert "ns-train" not in log.read_text()  # no wasted training
