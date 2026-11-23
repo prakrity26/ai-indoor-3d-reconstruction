@@ -17,3 +17,5 @@ tests
 .vscode
 .idea
 **/.DS_Store
+# Large reference outputs (Git LFS) are not needed inside images
+samples/img1299

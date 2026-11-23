@@ -1,5 +1,7 @@
 # AI-Based Indoor 3D Reconstruction & Spatial Experience Platform
 
+![A bedroom reconstructed from a phone video, in the walk viewer](samples/img1299/preview/walk_wardrobe.jpg)
+
 Record a room with an ordinary smartphone, upload the video, and explore the reconstructed space as an interactive 3D scene in the browser. Add hotspots and saved viewpoints, then share a read-only link or embed the scene on a website.
 
 ```text
@@ -14,7 +16,8 @@ This is an internship engineering project. The reconstruction engine is a reusab
 |---|---|
 | GitHub | https://github.com/prakrity26/ai-indoor-3d-reconstruction |
 | Progress log | [PROGRESS.md](PROGRESS.md) |
-| Sample reconstruction | [`samples/img7916/`](samples/README.md) (Git LFS) |
+| Walkable splat sample | [`samples/img1299/`](samples/README.md): 561k Gaussians, trained on an RTX 4090 (Git LFS, 139 MB) |
+| Mesh sample | [`samples/img7916/`](samples/README.md) (Git LFS) |
 
 ## Quick start
 
@@ -39,15 +42,27 @@ python -m queue.workers --pipeline mesh         # Phases 1–9 on CPU / Apple MP
 
 The sample room is listed on the dashboard straight away. Uploads are processed by the worker; the Processing jobs page shows each stage live.
 
-### Option B: Docker Compose (PostgreSQL + Redis)
+### Option B: Docker Compose (production layout)
 
 ```bash
 cp .env.example .env            # change POSTGRES_PASSWORD
-docker compose up --build       # first build downloads CPU PyTorch and Open3D
+docker compose up -d --build    # first build downloads CPU PyTorch and Open3D
 open http://localhost:8000
 ```
 
-Compose runs `api` (web platform + REST API), `worker` (mesh pipeline), `postgres`, and `redis`. Uploads and outputs live in `./data` on the host.
+Every concern runs in its own container, built from one [`Dockerfile`](Dockerfile):
+
+| Container | Image | What it runs |
+|---|---|---|
+| `api` | `indoor3d-api` (target `api`) | The whole web app: REST API, web platform, walk viewer · port 8000 |
+| `postgres` | `postgres:16-alpine` | Projects and jobs (volume `postgres_data`); migrations apply on start |
+| `redis` | `redis:7-alpine` | Wakes workers when a job arrives (optional) |
+| `worker` | `indoor3d-worker` (target `worker`) | Mesh pipeline, Phases 1–9, on CPU |
+| `worker-gateway` | `indoor3d-api` | Token-protected API for remote GPU workers · port 8001 · profile `gpu` |
+| `gpu-worker` | `indoor3d-gpu-worker` (target `gpu-worker`) | Photoreal splats (COLMAP + Nerfstudio) on an NVIDIA GPU · profile `gpu` |
+
+`docker compose --profile gpu up -d --build` adds the gateway and a GPU worker on a machine with the
+NVIDIA Container Toolkit (set `WORKER_TOKEN` in `.env`). Uploads and outputs live in `./data` on the host.
 
 ## The web platform
 
@@ -59,7 +74,7 @@ Served by FastAPI at `/` (plain ES modules in [`ui/web/`](ui/web), no build step
 | **My projects** | Search, filter by status, grid/list view; project page with video preview, input-quality warnings, reconstruction metrics, downloads, rename, retry, delete |
 | **Create project** | Drag-and-drop upload with recording guidelines, in-browser checks (format, size, duration, resolution, orientation), name and description, upload progress |
 | **Processing jobs** | Status, current stage and progress for every upload; retry failed jobs |
-| **3D Studio** | Orbit / zoom / pan / reset / fullscreen / auto-rotate on the mesh; Walk mode (W A S D) on a Gaussian splat; edit mode to place info markers, text labels, and image/video markers; saved camera viewpoints and a start view; background, exposure, and shadow settings; `Cmd/Ctrl+S` to save |
+| **3D Studio** | Orbit / zoom / pan / reset / fullscreen / auto-rotate on the mesh; Walk mode on a Gaussian splat (see below); edit mode to place info markers, text labels, and image/video markers; saved camera viewpoints and a start view; background, exposure, and shadow settings; `Cmd/Ctrl+S` to save |
 | **Shared scenes** | Public links, embed code, make private, reset link |
 | **Settings** | Theme, default viewer mode, platform info (database, queue, upload limit) |
 
@@ -73,6 +88,17 @@ A shared scene opens at `/s/<token>` (read-only viewer with hotspots and views).
 | Gaussian splat (`point_cloud.ply`) | GaussianSplats3D (Walk) | Photoreal exploration; needs CUDA training |
 
 They are different formats with different viewers. A splat is not rendered as a GLB mesh.
+
+### Walk viewer
+
+`/viewer?ply=/jobs/<id>/point_cloud.ply` ([`ui/splat_viewer.html`](ui/splat_viewer.html)) is the
+first-person experience used by Walk mode, shared links, and embeds:
+
+- **Walk**: W A S D or arrows at eye height with smooth acceleration, Shift to go faster, drag to look (no mouse capture), double-click to glide to a spot, Q/E to change eye height.
+- **Phones**: left thumb is a joystick, right thumb looks, double-tap glides.
+- **Orbit**: a dollhouse view of the whole space. **Tour**: a slow automatic walk-around.
+- **HD** toggles view-dependent colour (spherical harmonics) and anti-aliasing for slower devices; ⛶ goes fullscreen; R resets.
+- The room's up axis is detected automatically (COLMAP −Y vs. Nerfstudio +Z); the Studio's ↕ button overrides it.
 
 ## Photoreal splats on a GPU
 
@@ -107,7 +133,22 @@ cloudflared tunnel --url http://localhost:8001   # prints https://<random>.trycl
 Keep the laptop **awake, lid open, and plugged in** until training finishes; if it sleeps, the
 tunnel dies. In a spare terminal: `caffeinate -dims`.
 
-**2. In Colab**, open [`notebooks/colab_gpu_worker.ipynb`](notebooks/colab_gpu_worker.ipynb)
+**2a. On a rented GPU (recommended: RunPod RTX 4090 or A6000, about $0.70–0.90/hour, roughly
+$1 per splat).** Run the `gpu-worker` image, or on a plain CUDA PyTorch pod:
+
+```bash
+apt-get update && apt-get install -y colmap ffmpeg git
+pip install --ignore-installed blinker && pip install nerfstudio     # Ubuntu's blinker breaks the install
+git clone https://github.com/prakrity26/ai-indoor-3d-reconstruction.git && cd ai-indoor-3d-reconstruction
+pip install --no-deps -e . && pip install httpx "sqlalchemy>=2"
+export WORKER_GATEWAY_URL=https://<random>.trycloudflare.com
+read -rs WORKER_TOKEN && export WORKER_TOKEN                          # paste, Enter (hidden)
+SPLAT_NUM_FRAMES=300 python -m queue.workers --pipeline splat --name runpod-4090
+```
+
+On an RTX 4090: COLMAP ~13 min, training ~20 min, upload a few minutes. Stop the pod afterwards.
+
+**2b. In Colab** (free, slower, disconnects), open [`notebooks/colab_gpu_worker.ipynb`](notebooks/colab_gpu_worker.ipynb)
 (File → Open notebook → GitHub → `prakrity26/ai-indoor-3d-reconstruction`), choose a GPU runtime,
 run the cells (cell 3b builds the CUDA kernels once per session, or restores them from Drive),
 and paste the tunnel URL and token when asked. Leave the last cell running.
@@ -125,6 +166,9 @@ Details:
 - Frames are shrunk to `SPLAT_MAX_SIDE` (default 1600 px) before COLMAP, which runs on the CPU on Colab; full-size 4K frames made feature extraction alone take ~27 minutes.
 - On a CUDA machine that shares the database, skip the gateway: `python -m queue.workers --pipeline splat`.
 - Docker: `docker compose --profile gpu up -d worker-gateway` runs the gateway (set `WORKER_TOKEN` in `.env`).
+- COLMAP threads are capped to the CPUs the container may use (`SPLAT_COLMAP_THREADS`, ≤ 16 by default). Rented pods expose every host core (96+), and one SIFT thread per core was OOM-killed.
+- When COLMAP cannot connect every frame it writes several models (`sparse/0`, `1`, `2`…). Nerfstudio only reads `sparse/0`, which on IMG_1299 held 4 frames while `sparse/2` held 216; the trainer now picks the largest model.
+- Jobs stop before training when COLMAP places fewer than `SPLAT_MIN_REGISTERED` (30%) of the frames, with filming advice instead of a useless splat.
 - Filming matters most: a slow, overlapping walk (three loops at different heights) gives a far better splat than a fast pan.
 
 ## Architecture
@@ -205,7 +249,8 @@ shared/       Job store, worker loop, broker, settings
 samples/      Checked-in sample reconstruction (Git LFS)
 notebooks/    Colab GPU notebooks for splat training
 tests/        pytest suite
-Dockerfile    api and worker targets
+Dockerfile    api, worker and gpu-worker targets
+docker-compose.yml  api, postgres, redis, worker; gateway + gpu-worker in the "gpu" profile
 ```
 
 ## Configuration
@@ -216,7 +261,7 @@ Copy `.env.example` to `.env`. Key settings: `DATABASE_URL` (empty → SQLite in
 
 - **No authentication.** Single-user mode. "Private" means "no share link"; file URLs are not access-controlled. Put the app behind a trusted network or add auth before exposing it publicly.
 - Mesh quality is coarse and can look incomplete; scale is relative.
-- Walkable splats need a CUDA GPU; the Docker worker runs only the mesh pipeline, and splats come from a GPU worker (Colab or a cloud GPU).
+- Walkable splats need an NVIDIA GPU (the `gpu-worker` image, a rented GPU, or Colab); the CPU `worker` runs only the mesh pipeline.
 - The splat viewer (GaussianSplats3D) did not render in the WebKit-based preview browser used during development; use a current Chrome, Edge, or Firefox for Walk mode.
 - Hotspots are placed on the mesh (Orbit mode), not inside the splat viewer.
 - Media markers link to images/videos by URL; files are not uploaded to the platform.

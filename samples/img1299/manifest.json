@@ -1,0 +1,30 @@
+{
+  "job_id": "img1299",
+  "source_video": "IMG_1299",
+  "kind": "gaussian_splat",
+  "file": "point_cloud.ply",
+  "format": "3DGS PLY (Nerfstudio splatfacto export, SH degree 3)",
+  "gaussians": 561314,
+  "vertical_axis": "+z",
+  "bytes": 139207465,
+  "sha256_prefix": "d71ef6fa9ad13a55",
+  "capture": "iPhone video, landscape, about 109 s; 300 frames sampled at 1600 px",
+  "colmap": {
+    "frames_placed": 216,
+    "frames_sampled": 300,
+    "models": [
+      2,
+      13,
+      89,
+      216
+    ],
+    "matching": "sequential"
+  },
+  "training": {
+    "trainer": "nerfstudio splatfacto 1.1.5",
+    "steps": 30000,
+    "gpu": "RunPod RTX 4090",
+    "minutes": 7
+  },
+  "scale": "relative (monocular video has no metric scale)"
+}
