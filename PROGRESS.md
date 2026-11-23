@@ -10,15 +10,18 @@ This file is the public progress note. Detailed daily/weekly notes stay in the l
 
 | Item | Status |
 |------|--------|
-| Phases 0–7 (video → frames → pose → depth → cloud → mesh) | Done and on GitHub |
+| Phases 0–7 (video → frames → pose → depth → cloud → mesh) | Done |
+| Phase 8 object labels (`scene.json`) | Done; YOLO weights are an optional extra |
+| Phase 9 evaluation (`evaluation.json`) | Done |
+| Phase 10 API | Done; projects, uploads, progress, studio document, sharing, files |
+| Phase 11 job database | Done; SQLite by default, Postgres via `DATABASE_URL`, versioned migrations |
+| Phase 12 worker | Done; per-stage progress, retry, crash/stop recovery |
+| Phase 13 web platform | Done; Dashboard, My projects, Create project, Processing jobs, 3D Studio, Shared scenes, Settings |
+| Phase 14 Docker | Done; `api` and `worker` images, Compose with Postgres and Redis |
+| Phase 15 hardening and CI | Done; streamed uploads with limits, security headers, stale-job recovery, GitHub Actions |
+| Phase 16 documentation | Done; README, module READMEs, this log |
 | Sample mesh + filtered cloud | `samples/img7916/` (Git LFS), from clip `IMG_7916` |
-| Walkable Gaussian splat (`IMG_7916`) | Training on Colab GPU; PLY not in the repo yet |
-| Phase 8 object labels (`scene.json`) | Done locally; YOLO weights are an optional extra |
-| Phase 9 evaluation (`evaluation.json`) | Done locally; scores the files already on disk |
-| Phase 10 API and Phase 13 scene UI | Done locally; the page lists the sample mesh and new uploads |
-| Phase 11 job database | Done locally; SQLite by default, Postgres when DATABASE_URL is set |
-| Phase 12 worker | Done locally; the database is the queue, Redis is an optional wake-up |
-| Phases 14–16 (Docker, hardening, final docs) | Not started |
+| Walkable Gaussian splat (`IMG_7916`) | Training path works on Colab GPU; PLY not in the repo yet |
 
 ## What the sample output is
 
@@ -31,10 +34,10 @@ cd ai-indoor-3d-reconstruction
 python3.10 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
-python -m ui.demo --job-id img7916
+python -m api
 ```
 
-Opens http://127.0.0.1:8765/ — drag to orbit.
+Opens the web platform at http://127.0.0.1:8000/. The sample room is on the dashboard; open it in the 3D Studio and drag to orbit. To process your own video, upload it on Create project and run `python -m queue.workers --pipeline mesh` in a second terminal.
 
 ## Timeline
 
@@ -47,6 +50,7 @@ Opens http://127.0.0.1:8765/ — drag to orbit.
 | 2026-09-17 | Phase 7 Poisson mesh (GLB/PLY); splat training path in this same repo |
 | 2026-09-28 | Sample mesh on GitHub from `IMG_7916`; local mesh/splat viewers; Colab splat PLY still pending |
 | 2026-10-26 | Phase 8 indoor object labels (`scene.json`); Phase 9 evaluation JSON for an existing job |
+| 2026-11-23 | Phases 10–13 committed; web platform (7 sections, 3D Studio editor, sharing); Docker (14); hardening and CI (15); docs (16). First real video processed end to end through upload → worker → studio |
 
 ## Pipeline (Phases 1–9)
 
@@ -58,9 +62,12 @@ Scale is **relative** (not metric). The mesh can look incomplete or ballooned. T
 
 Same repository, `model/splat` + `notebooks/colab_gaussian_splat.ipynb`. Mac prepares frames; Colab (CUDA + COLMAP + gsplat) trains. Walk viewer: `python -m ui.splat_demo` after `point_cloud.ply` exists.
 
-## How to judge this week’s delivery
+## How to review the delivery
 
-1. Clone with Git LFS.
-2. Open `samples/img7916/` for mesh and cloud files.
-3. Run `python -m ui.demo --job-id img7916`.
-4. Treat the splat as in progress until the Colab PLY is copied into `samples/` and pushed.
+1. Clone with Git LFS and install as above (`pip install -e ".[dev,api,depth,cloud]"`).
+2. `python -m api`, open http://127.0.0.1:8000/, and open the sample room in the 3D Studio.
+3. In the Studio: turn on Edit, click the model to add a hotspot, save a view, then Share → "Anyone with the link" and open the link.
+4. Upload a short room video on Create project and run `python -m queue.workers --pipeline mesh`; watch Processing jobs.
+5. Or run everything with `docker compose up --build`.
+6. `pytest` runs the test suite.
+7. Treat the splat as in progress until the Colab PLY is copied into `samples/` and pushed.

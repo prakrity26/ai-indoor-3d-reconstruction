@@ -1,31 +1,35 @@
 # ui
 
-The product page is the interactive studio served by the API. The scene fills the screen. Orbit turns the mesh. Walk moves through a splat with W A S D. Streamlit is a second client that calls the same API.
+**Phases:** 13 (web platform) · **Status:** implemented
 
-**Phase:** 13  
-**Status:** studio page and Streamlit client
+## `ui/web/`: the web platform
 
-Neither client imports `model/` or runs reconstruction.
+A single-page app served by the API at `/`. Plain ES modules, no build step, no framework. Every
+text value goes through `textContent`, so project names and hotspot text cannot inject HTML.
+
+| File | Role |
+|---|---|
+| `index.html` | App shell: sidebar, top bar, `<main>` |
+| `share.html` | Public read-only viewer for `/s/<token>` and `/embed/<token>` |
+| `assets/app.css` | Design tokens (light and dark), layout, components |
+| `assets/js/main.js` | Hash router (`#/`, `#/projects`, `#/projects/<id>`, `#/new`, `#/jobs`, `#/studio/<id>`, `#/shared`, `#/settings`) |
+| `assets/js/api.js` | REST client, upload with progress |
+| `assets/js/viewer.js` | Mesh viewer on `<model-viewer>` (orbit, zoom, pan, reset, fullscreen, hotspots, viewpoints) and the splat iframe |
+| `assets/js/pages/*.js` | One module per section |
+
+External scripts: `<model-viewer>` 4.0.0 (Google CDN) for meshes; three.js 0.170 and
+GaussianSplats3D 0.4.7 (unpkg) inside `splat_viewer.html`. The browser needs internet access once
+to load them.
 
 ```bash
 pip install -e ".[api]"
-python -m api
+python -m api            # http://127.0.0.1:8000
 ```
 
-Open http://127.0.0.1:8000/. The sample mesh has an Orbit button. Walk appears after a splat file exists.
+## Other files
 
-Streamlit, against that API:
+- `orbit.html`, `splat_viewer.html`: standalone viewers; the studio frames `splat_viewer.html` for Walk mode.
+- `app.py`: a small Streamlit client that calls the same API (`pip install -e ".[ui]"`, `streamlit run ui/app.py`).
+- `demo.py`, `splat_demo.py`: local previews without the API (`python -m ui.demo --job-id img7916`).
 
-```bash
-pip install -e ".[ui]"
-streamlit run ui/app.py
-```
-
-`API_URL` defaults to http://127.0.0.1:8000.
-
-Local previews that do not use the API:
-
-```bash
-python -m ui.demo --job-id img7916
-python -m ui.splat_demo --job-id img7916
-```
+None of these import `model/` or run reconstruction.

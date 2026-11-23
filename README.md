@@ -1,195 +1,175 @@
-# AI-Based Indoor 3D Reconstruction System
+# AI-Based Indoor 3D Reconstruction & Spatial Experience Platform
 
-A modular system for 3D scene reconstruction and spatial understanding from monocular indoor video.
-
-This repository is an internship engineering project. The reconstruction engine is designed as a reusable module that a company application can call through a REST API, without depending on the Streamlit UI or on internal pipeline details.
-
-**Current status:** Phases 1–13 are implemented (reconstruction, labels, evaluation, API, SQLite job status, a separate worker, and the scene UI). Sample mesh outputs are in [`samples/img7916/`](samples/README.md) from clip `IMG_7916`. A walkable Gaussian splat for the same clip is trained on Colab and is not stored in git until the PLY is saved. Docker and the final write-up are still ahead.
-
-## Review
-
-GitHub account: **[prakrity26](https://github.com/prakrity26)**  
-Repository: **https://github.com/prakrity26/ai-indoor-3d-reconstruction**  
-Progress log: **[PROGRESS.md](PROGRESS.md)** (work through Phases 1–7). Sample 3D files use **Git LFS**.
-
-| What to look at | Where |
-|-----------------|--------|
-| Code through week 05 / Phases 1–7 | `model/` (preprocessing → mesh) |
-| Mesh output (orbit) | `samples/img7916/mesh.glb` |
-| Filtered point cloud | `samples/img7916/cloud_filtered.ply` |
-| How to open the product UI | `python -m api` then http://127.0.0.1:8000/ |
-| Optional splat training | `notebooks/colab_gaussian_splat.ipynb` then `python -m ui.splat_demo` |
-
-After clone:
-
-```bash
-python3.10 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-python -m ui.demo --job-id img7916
-```
-
-That serves **http://127.0.0.1:8765/** from the checked-in sample GLB. Internet is needed once for the viewer library.
-
-## Mesh preview (local)
-
-The indoor clip is already reconstructed. Do **not** re-train splat on stage.
-
-```bash
-# from the project root, with the venv active
-python -m ui.demo --job-id img7916
-```
-
-Show: selected frames on the left, orbitable GLB on the right. Say: relative scale, estimated mesh, API still remaining.
-
-To rebuild only the mesh from the existing filtered cloud (optional, needs `.[cloud]`):
-
-```bash
-python -m model.mesh data/frames/img7916
-```
-
-
-## Problem
-
-An ordinary indoor phone video is a sequential 2D recording. It is not an explorable spatial model. This project asks:
-
-> How effectively can a monocular indoor video be converted into an interactive 3D representation using modern AI and computer-vision techniques while maintaining an acceptable balance between reconstruction quality, processing time and computational cost?
-
-The intended output is reconstructed geometry (point cloud / mesh) plus metadata, not a video with a 3D effect.
-
-## Target user flow
+Record a room with an ordinary smartphone, upload the video, and explore the reconstructed space as an interactive 3D scene in the browser. Add hotspots and saved viewpoints, then share a read-only link or embed the scene on a website.
 
 ```text
-Upload indoor video
-        ↓
-Validate and enqueue a reconstruction job
-        ↓
-Worker: frames → poses → depth → fusion → mesh → scene analysis
-        ↓
-Store GLB/PLY + metadata
-        ↓
-Interactive 3D exploration  (or API consumption by another app)
+Capture → Upload → Process → Reconstruct → Explore → Edit → Save → Share
 ```
 
-## What this project is not
+This is an internship engineering project. The reconstruction engine is a reusable module behind a REST API, so other company products can call it without the web platform.
 
-- A copy or wrapper of LingBot-Map (LingBot-Map is a concept reference only)
-- A standalone YOLO, depth, Streamlit, or 3D-viewer demo
-- A claim of a new fundamental reconstruction algorithm unless one is later implemented and evaluated
-- A promise of ground-truth geometry
+**Status:** all 16 phases are implemented. The reconstruction pipeline (Phases 1–9), the API, job database, worker, web platform, Docker stack, CI, and documentation are in this repository. A walkable Gaussian splat is trained on a CUDA GPU (Colab); the trained PLY for the sample clip is not in git yet. See [PROGRESS.md](PROGRESS.md).
+
+| | |
+|---|---|
+| GitHub | https://github.com/prakrity26/ai-indoor-3d-reconstruction |
+| Progress log | [PROGRESS.md](PROGRESS.md) |
+| Sample reconstruction | [`samples/img7916/`](samples/README.md) (Git LFS) |
+
+## Quick start
+
+### Option A: laptop (SQLite, no Docker)
+
+Requires Python 3.10+.
+
+```bash
+git lfs install && git clone git@github.com:prakrity26/ai-indoor-3d-reconstruction.git
+cd ai-indoor-3d-reconstruction
+python3.10 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev,api,depth,cloud]"
+python -m api                                   # http://127.0.0.1:8000
+```
+
+In a second terminal, start a worker so uploads get processed:
+
+```bash
+source .venv/bin/activate
+python -m queue.workers --pipeline mesh         # Phases 1–9 on CPU / Apple MPS
+```
+
+The sample room is listed on the dashboard straight away. Uploads are processed by the worker; the Processing jobs page shows each stage live.
+
+### Option B: Docker Compose (PostgreSQL + Redis)
+
+```bash
+cp .env.example .env            # change POSTGRES_PASSWORD
+docker compose up --build       # first build downloads CPU PyTorch and Open3D
+open http://localhost:8000
+```
+
+Compose runs `api` (web platform + REST API), `worker` (mesh pipeline), `postgres`, and `redis`. Uploads and outputs live in `./data` on the host.
+
+## The web platform
+
+Served by FastAPI at `/` (plain ES modules in [`ui/web/`](ui/web), no build step).
+
+| Section | What it does |
+|---|---|
+| **Dashboard** | Project counts, recent projects, live processing jobs, capture tips |
+| **My projects** | Search, filter by status, grid/list view; project page with video preview, input-quality warnings, reconstruction metrics, downloads, rename, retry, delete |
+| **Create project** | Drag-and-drop upload with recording guidelines, in-browser checks (format, size, duration, resolution, orientation), name and description, upload progress |
+| **Processing jobs** | Status, current stage and progress for every upload; retry failed jobs |
+| **3D Studio** | Orbit / zoom / pan / reset / fullscreen / auto-rotate on the mesh; Walk mode (W A S D) on a Gaussian splat; edit mode to place info markers, text labels, and image/video markers; saved camera viewpoints and a start view; background, exposure, and shadow settings; `Cmd/Ctrl+S` to save |
+| **Shared scenes** | Public links, embed code, make private, reset link |
+| **Settings** | Theme, default viewer mode, platform info (database, queue, upload limit) |
+
+A shared scene opens at `/s/<token>` (read-only viewer with hotspots and views). `/embed/<token>` is the same viewer without chrome, for an `<iframe>`.
+
+### Mesh vs. Gaussian splat
+
+| Representation | Viewer | Use |
+|---|---|---|
+| Mesh (`mesh.glb`) | `<model-viewer>` (Orbit) | Explicit geometry, hotspots, compatibility with 3D tools |
+| Gaussian splat (`point_cloud.ply`) | GaussianSplats3D (Walk) | Photoreal exploration; needs CUDA training |
+
+They are different formats with different viewers. A splat is not rendered as a GLB mesh.
 
 ## Architecture
 
-Five services, one Compose file. The UI talks only to the API. The API does not run reconstruction inline. The worker will own the reconstruction engine. Phases 1–7 are the local mesh library. Gaussian splat training is the same repository (`model/splat` + `notebooks/`); Colab only provides a GPU.
-
 ```text
-                 Streamlit UI
-                      │
-                      ▼
-                 FastAPI API
-                      │
-          ┌───────────┼───────────┐
-          ▼           ▼           ▼
-      PostgreSQL    Redis      ML Worker
-                                  │
-                                  ▼
-                         Reconstruction Engine
-                    (OpenCV, pose, depth, 3D)
+ Browser ── web platform (ui/web) ─┐
+                                   ▼
+                         FastAPI (api/)  ──  files on disk (data/)
+                          │        │              ▲
+                 PostgreSQL /    Redis (wake-up)  │
+                 SQLite (jobs)     │              │
+                          └────────┴──► Worker (queue/, shared/worker.py)
+                                              │
+                                   Reconstruction engine (model/)
+              frames → keyframes → poses → depth → cloud → filter/fuse → mesh → labels → evaluation
 ```
+
+- The API never runs reconstruction. It saves the upload (streamed to disk), creates a `queued` row, and serves files a worker wrote.
+- The **database is the queue**. Workers claim the oldest queued row (`SKIP LOCKED` on Postgres). Redis, when configured, only wakes workers early.
+- Workers report the current stage and percentage; the UI polls it. Jobs stuck in `running` after a crash or `docker stop` are marked failed and can be retried.
+- Studio documents (hotspots, viewpoints, settings) are validated JSON in `data/jobs/_studio/<job_id>.json`.
+
+## REST API
+
+| Method & path | Purpose |
+|---|---|
+| `GET /health` · `GET /api/config` | Liveness; upload limit, formats, database and queue type |
+| `GET /jobs` · `POST /jobs` | List projects · upload a video (`file`, `name`, `description`) |
+| `GET /jobs/{id}` · `PATCH /jobs/{id}` · `DELETE /jobs/{id}` | Read (with stage, progress, input warnings, artifacts) · rename/describe · delete everything the job wrote |
+| `POST /jobs/{id}/retry` | Re-queue a failed job |
+| `GET\|PUT /jobs/{id}/studio.json` | Hotspots, viewpoints, scene settings |
+| `PUT /jobs/{id}/visibility` · `POST /jobs/{id}/share/rotate` | `private` / `public`; issue a new share token |
+| `GET /shared/{token}` | Public, read-only project + studio document |
+| `GET /jobs/{id}/mesh.glb` · `point_cloud.ply` · `scene.json` · `evaluation.json` · `thumbnail.jpg` · `source` | Files |
+
+Interactive docs: http://127.0.0.1:8000/docs.
+
+## Reconstruction pipeline (CLI)
+
+Each phase also runs on its own. Put **your own** indoor video in `data/uploads/`.
+
+```bash
+python -m model.preprocessing data/uploads/your_room.mp4   # 1 validate, extract frames
+python -m model.frame_selection data/frames/<job_id>       # 2 keyframes
+python -m model.camera data/frames/<job_id>                # 3 relative poses
+python -m model.depth data/frames/<job_id>                 # 4 Depth Anything (needs .[depth])
+python -m model.reconstruction data/frames/<job_id>        # 5 back-projected cloud
+python -m model.pointcloud data/frames/<job_id>            # 6 filter + voxel fusion (needs .[cloud])
+python -m model.mesh data/frames/<job_id>                  # 7 Poisson mesh → GLB/PLY
+python -m model.scene_understanding data/frames/<job_id>   # 8 object labels (.[detect] optional)
+python -m model.evaluation data/frames/<job_id>            # 9 evaluation.json
+```
+
+Gaussian splat (CUDA): prepare frames on the Mac with `python -m model.splat <video> --job-id <id> --prepare-only`, train with [`notebooks/colab_gaussian_splat.ipynb`](notebooks/README.md), or run `python -m queue.workers --pipeline splat` on a CUDA host.
+
+**Scale is relative**, not metres: monocular video has no metric scale.
+
+## Testing
+
+```bash
+pip install -e ".[dev,api,db,queue,cloud]"
+pytest
+```
+
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs the test suite, syntax-checks the frontend modules, and builds and smoke-tests the API image.
 
 ## Repository layout
 
-Python packages use lowercase names. They map to the conceptual modules UI, API, MODEL, DATABASE, QUEUE, and SHARED.
-
 ```text
-ai-indoor-3d-reconstruction/
-├── ui/                 # Streamlit (Phase 13)
-├── api/                # FastAPI (Phase 10)
-├── model/              # Reconstruction engine (Phases 1–9 + splat path)
-├── notebooks/          # Colab GPU notebooks (clone this repo; not a second project)
-├── database/           # Persistence (Phase 11)
-├── queue/              # Async workers (Phase 12)
-├── shared/             # Schemas, config, utilities
-├── data/               # Runtime artifacts (gitignored content)
-├── tests/
-├── docker-compose.yml
-├── .env.example
-└── README.md
+api/          FastAPI app, artifact lookup, studio document validation
+ui/web/       Web platform (index.html, share.html, assets/)
+ui/           Standalone mesh/splat viewers and a Streamlit client
+model/        Reconstruction engine (Phases 1–9) and the splat trainer
+database/     SQLAlchemy model, repository, versioned SQL migrations
+queue/        Worker entry point (python -m queue.workers)
+shared/       Job store, worker loop, broker, settings
+samples/      Checked-in sample reconstruction (Git LFS)
+notebooks/    Colab GPU notebooks for splat training
+tests/        pytest suite
+Dockerfile    api and worker targets
 ```
 
-## Development phases
+## Configuration
 
-Work proceeds **one phase at a time**. Do not start the next phase until the current one is reviewed.
+Copy `.env.example` to `.env`. Key settings: `DATABASE_URL` (empty → SQLite in `data/jobs/`), `REDIS_URL` (optional), `MAX_UPLOAD_MB`, `COMPUTE_DEVICE` (`auto` / `mps` / `cuda` / `cpu`), `MESH_POISSON_THREADS`, `WORKER_STALE_MINUTES`.
 
-| Phase | Focus |
-|------:|-------|
-| 0 | Planning and architecture | done |
-| 1 | Video ingestion and preprocessing | done |
-| 2 | Adaptive frame selection | done |
-| 3 | Camera pose estimation | done |
-| 4 | Depth estimation | done |
-| 5 | 3D point-cloud generation | done |
-| 6 | Point-cloud filtering and fusion | done |
-| 7 | Mesh reconstruction and GLB/PLY export | implemented |
-| 8 | Object detection and scene understanding | done |
-| 9 | Evaluation and benchmarking | done |
-| 10 | FastAPI service | done |
-| 11 | Database | done |
-| 12 | Queue and asynchronous workers | done |
-| 13 | Streamlit UI | done |
-| 14 | Docker and Compose hardening |
-| 15 | Testing, optimization, production hardening |
-| 16 | Final documentation and internship deliverables |
+## Known limitations
 
-## Hardware
+- **No authentication.** Single-user mode. "Private" means "no share link"; file URLs are not access-controlled. Put the app behind a trusted network or add auth before exposing it publicly.
+- Mesh quality is coarse and can look incomplete; scale is relative.
+- Walkable splats need a CUDA GPU and COLMAP; the Docker worker runs only the mesh pipeline.
+- Hotspots are placed on the mesh (Orbit mode), not inside the splat viewer.
+- Media markers link to images/videos by URL; files are not uploaded to the platform.
+- 360° video is out of scope for this version.
 
-Development is on Apple Silicon. The design assumes:
+## Future work
 
-- No NVIDIA CUDA on the development machine
-- PyTorch MPS when a model phase needs it, with CPU fallback
-- **Gaussian splat training uses NVIDIA CUDA.** Development GPU is Google Colab running **this** repo. A later worker can use the same `python -m model.splat` command.
-- A later production host may enable CUDA through a device abstraction
-
-## Local setup (Phases 1–7)
-
-Requires Python 3.10 or newer (Homebrew `python3.10` on this Apple Silicon machine).
-
-Put **your own** indoor phone video in `data/uploads/` (or pass any local path). Do not use Hugging Face demo videos.
-
-```bash
-cp .env.example .env
-python3.10 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev,depth,cloud]"
-pytest
-python -m model.preprocessing data/uploads/your_room.mp4
-python -m model.frame_selection data/frames/<job_id>
-python -m model.camera data/frames/<job_id>
-python -m model.depth data/frames/<job_id>
-python -m model.reconstruction data/frames/<job_id>
-python -m model.pointcloud data/frames/<job_id>
-python -m model.mesh data/frames/<job_id>
-python -m model.scene_understanding data/frames/<job_id>
-python -m model.evaluation data/frames/<job_id>
-```
-
-Phase 4 needs `.[depth]`. Phases 6–7 need `.[cloud]` (Open3D). Phase 8 needs `.[detect]` for YOLOv8n; tests pass a local detector and do not download weights. `mesh.glb` is the laptop fallback. For a Captures-like walkable splat, use **this repo** on Colab:
-
-```bash
-# Mac: extract overlapping frames only
-python -m model.splat data/uploads/your_room.mp4 --job-id room_splat --prepare-only
-
-# Colab GPU: open notebooks/colab_gaussian_splat.ipynb (clones this GitHub repo)
-# then save point_cloud.ply and run: python -m ui.splat_demo --job-id img7916
-```
-
-Artifacts land under `data/frames/<job_id>/` (and copies under `data/outputs/<job_id>/`) and are gitignored.
-
-`docker compose config` still validates the Compose skeleton. Application services are not built yet.
-
-## Documentation
-
-Architecture notes, the proposal outline, daily logs, weekly reports, and experiment records live in the local `docs/` folder. That folder is gitignored and is **not** published to GitHub.
+Authentication and teams · uploading media for hotspots · hotspots in Walk mode · QR-code sharing · 360° capture · metric scale from known objects · collaboration.
 
 ## License
 

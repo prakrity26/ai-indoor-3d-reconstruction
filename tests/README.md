@@ -26,11 +26,13 @@ Phase 11: `test_database.py` stores job status in SQLite, claims the next queued
 
 Phase 12: `test_queue.py` keeps the database as the queue, reports a missing Redis server, and lets a mesh job finish without a splat.
 
+Platform (Phases 13–15): `test_platform.py` covers upload name/description and source video, size and type limits with cleanup, rename/retry/delete (including frames and outputs), samples as undeletable projects with thumbnails, per-stage worker progress, studio document validation (hotspots, viewpoints, clamped settings, rejected `javascript:` links), share links (publish, rotate, make private), health/config, upgrading an old database in place, stale-job recovery, interrupted jobs, and security headers.
+
 Splat path: `test_splat.py` prepares overlapping JPEGs in this repo and checks COLMAP TXT parsing. Training is CUDA-only (Colab) and is not run in pytest.
 
 ```bash
 source .venv/bin/activate
-pip install -e ".[dev,cloud]"
+pip install -e ".[dev,api,db,queue,cloud]"
 pytest
 ```
 

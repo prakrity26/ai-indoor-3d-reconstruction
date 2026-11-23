@@ -1,18 +1,31 @@
 # database
 
-Job status for the API and the worker.
+Project and job metadata shared by the API and the worker.
 
-**Phase:** 11  
-**Status:** implemented
+**Phase:** 11 · **Status:** implemented
 
-The video file and the splat stay on disk. The database stores the job id, status, filename, paths, and error.
+Videos, frames, meshes, and splats stay on disk. The `jobs` table stores, per project: id, status,
+stage and progress, name and description, file paths, error, visibility and share token, origin
+(`upload` or `sample`), and timestamps.
 
-On this laptop the table is SQLite at `data/jobs/index.sqlite`. That is the default, so the API runs without Postgres.
-
-PostgreSQL uses the same table when `DATABASE_URL` starts with `postgresql://`. That needs the driver:
+SQLite is the default (`data/jobs/index.sqlite`, WAL mode, so the API and a worker can share it).
+PostgreSQL is used when `DATABASE_URL` starts with `postgresql://` and needs the driver:
 
 ```bash
 pip install -e ".[db]"
 ```
 
-Schema version: `database/migrations/001_jobs.sql`. Tests use a temporary SQLite file and do not start Postgres.
+## Migrations
+
+Numbered SQL files in `migrations/` are applied once each, in order, when a connection opens.
+Applied versions are recorded in `schema_migrations`. A database created before version tracking
+existed (only `001` applied) is upgraded in place by `002_projects.sql`.
+
+| File | Adds |
+|---|---|
+| `001_jobs.sql` | The `jobs` table |
+| `002_projects.sql` | Name, description, visibility, share token, stage, progress, mesh path, origin, updated time |
+
+To change the schema, add `003_<name>.sql`; never edit an applied file.
+
+Tests use a temporary SQLite file and do not start Postgres.
