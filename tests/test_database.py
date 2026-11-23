@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -48,7 +49,9 @@ def test_store_keeps_the_video_and_the_row(tmp_path: Path) -> None:
     assert store.get("hall")["error"] == "cuda required"
 
 
-def test_postgres_url_needs_the_driver() -> None:
+def test_postgres_url_needs_the_driver(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Simulate the driver being absent even where the db extra is installed (CI installs it).
+    monkeypatch.setitem(sys.modules, "psycopg", None)
     with pytest.raises(DatabaseError) as err:
         JobRepository("postgresql://reconstruction:change-me@localhost:5432/reconstruction")
     assert err.value.code == "postgres_driver_missing"
