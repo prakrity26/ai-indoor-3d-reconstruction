@@ -92,20 +92,22 @@ export async function render(main, _params, ctx) {
     uploading = true;
     submit.disabled = true;
     progress.hidden = false;
-    const fill = h("div", { class: "progress-fill", style: { width: "0%" } });
+    const bar = h("div", { class: "progress-fill", style: { width: "0%" } });
     const label = h("span", { class: "small muted", text: "Uploading… 0%" });
-    fill(progress, h("div", { class: "progress progress-running" }, fill), label);
     try {
+      // Inside try: any failure here must surface as a message, never a silent dead button.
+      fill(progress, h("div", { class: "progress progress-running" }, bar), label);
       const project = await api.upload(file, { name: nameInput.value, description: descInput.value, splat: splatInput.checked }, (fraction) => {
         const pct = Math.round(fraction * 100);
-        fill.style.width = `${pct}%`;
+        bar.style.width = `${pct}%`;
         label.textContent = pct >= 100 ? "Saving on the server…" : `Uploading… ${pct}%`;
       });
       toast("Upload complete. Processing has been queued.", "success");
       ctx.navigate(`#/projects/${project.job_id}`);
     } catch (error) {
-      toast(error.message, "error");
-      label.textContent = error.message;
+      const message = error.message || String(error);
+      toast(message, "error");
+      label.textContent = message;
       uploading = false;
       submit.disabled = false;
     }
