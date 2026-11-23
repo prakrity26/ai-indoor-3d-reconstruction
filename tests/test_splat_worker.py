@@ -409,3 +409,15 @@ def test_splatfacto_trains_on_the_largest_colmap_model(tmp_path: Path, monkeypat
     calls = log.read_text()
     assert "--skip-colmap --colmap-model-path colmap/sparse/2" in calls
     assert "Poses ready (10 of 12 frames)" in [stage for stage, _ in reports]
+
+
+def test_export_can_load_nerfstudio_checkpoints_on_new_pytorch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """PyTorch 2.6+ refused Nerfstudio's checkpoint in ns-export after a full RunPod training run."""
+    from model.splat.splatfacto import train_splatfacto
+
+    log = _fake_tools(tmp_path / "bin", monkeypatch)
+    monkeypatch.delenv("TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD", raising=False)
+    export = tmp_path / "bin" / "ns-export"
+    export.write_text(export.read_text().replace("#!/bin/sh\n", '#!/bin/sh\necho "WEIGHTS=$TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD" >> "$FAKE_LOG"\n', 1))
+    train_splatfacto(_video(tmp_path), tmp_path / "work", steps=1000, min_bytes=10)
+    assert "WEIGHTS=1" in log.read_text()

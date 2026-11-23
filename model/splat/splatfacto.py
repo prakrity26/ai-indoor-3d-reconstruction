@@ -92,6 +92,10 @@ def train_splatfacto(
     # gsplat compiles its CUDA kernels on first use. Unlimited parallel nvcc jobs ran Colab out of
     # memory (exit 137, "Killed"); two at a time fits in ~12 GB of RAM.
     env.setdefault("MAX_JOBS", "2")
+    # PyTorch ≥ 2.6 loads checkpoints with weights_only=True, and Nerfstudio's checkpoints hold
+    # numpy scalars, so ns-export failed with "Weights only load failed" after a full training
+    # run. These are checkpoints this worker just wrote, so the full loader is safe here.
+    env.setdefault("TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD", "1")
     _limit_colmap_threads(work, env)
 
     # ---- camera poses (or restore them) -------------------------------------------------------
