@@ -92,6 +92,7 @@ def train_splatfacto(
     # gsplat compiles its CUDA kernels on first use. Unlimited parallel nvcc jobs ran Colab out of
     # memory (exit 137, "Killed"); two at a time fits in ~12 GB of RAM.
     env.setdefault("MAX_JOBS", "2")
+    _limit_colmap_threads(work, env)
 
     # ---- camera poses (or restore them) -------------------------------------------------------
     fingerprint = {"video_bytes": Path(video).stat().st_size, "frames": frames, "max_side": max_side}
@@ -120,6 +121,7 @@ def train_splatfacto(
             cancel=cancel,
             stage="Estimating camera poses (COLMAP)",
         )
+        _use_largest_model(data, frame_dir, env=env, cancel=cancel)
         shutil.rmtree(frame_dir, ignore_errors=True)
         if persist:
             report("Saving camera poses to Drive", _PROCESS[1] - 1)
@@ -183,6 +185,100 @@ def train_splatfacto(
         )
     report("Uploading splat", _EXPORT[1])
     return ply
+
+
+def colmap_models(data: Path) -> dict[str, int]:
+    """Registered-image count of every model COLMAP wrote under ``data/colmap/sparse``.
+
+    When the mapper cannot connect all frames it writes several models (0, 1, 2, …) and their
+    order says nothing about size. A real IMG_1299 run gave 4, 88 and 216 frames.
+    """
+    models: dict[str, int] = {}
+    root = data / "colmap" / "sparse"
+    if not root.is_dir():
+        return models
+    for folder in sorted(root.iterdir()):
+        images = folder / "images.bin"
+        if images.is_file() and images.stat().st_size >= 8:
+            with images.open("rb") as handle:
+                models[folder.name] = int.from_bytes(handle.read(8), "little")
+    return models
+
+
+def _use_largest_model(data: Path, frame_dir: Path, *, env: dict, cancel: threading.Event) -> None:
+    """ns-process-data always converts sparse/0. Rebuild transforms.json from the biggest model."""
+    models = colmap_models(data)
+    if len(models) < 2:
+        return
+    best = max(models, key=models.get)
+    print(f"COLMAP models (frames placed): {models}; using sparse/{best}", flush=True)
+    if best == "0" or models[best] <= models.get("0", 0):
+        return
+    _run(
+        [
+            "ns-process-data", "images",
+            "--data", str(frame_dir),
+            "--output-dir", str(data),
+            "--skip-colmap",
+            "--colmap-model-path", f"colmap/sparse/{best}",
+        ],
+        env=env,
+        cancel=cancel,
+        stage="Estimating camera poses (COLMAP)",
+    )
+
+
+def colmap_threads() -> int:
+    """Threads COLMAP may use: SPLAT_COLMAP_THREADS, else the CPUs this process may run on (≤ 16).
+
+    COLMAP's default is one thread per *host* core. On rented GPU pods the container sees all 96+
+    cores of the machine but only ~35 GB of RAM, and CPU SIFT extraction then gets OOM-killed.
+    """
+    configured = os.environ.get("SPLAT_COLMAP_THREADS", "").strip()
+    if configured:
+        return max(1, int(configured))
+    try:
+        available = len(os.sched_getaffinity(0))
+    except (AttributeError, OSError):
+        available = os.cpu_count() or 4
+    quota = _cgroup_cpus()
+    if quota:
+        available = min(available, quota)
+    return max(1, min(16, available))
+
+
+def _cgroup_cpus() -> int | None:
+    try:
+        quota, period = Path("/sys/fs/cgroup/cpu.max").read_text().split()[:2]
+        if quota != "max":
+            return max(1, int(int(quota) / int(period)))
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def _limit_colmap_threads(work: Path, env: dict) -> None:
+    """Put a ``colmap`` shim first on PATH that caps its thread count (ns-process-data has no flag)."""
+    real = shutil.which("colmap", path=env.get("PATH"))
+    if real is None:
+        return
+    threads = colmap_threads()
+    bin_dir = work / "bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    shim = bin_dir / "colmap"
+    shim.write_text(
+        "#!/bin/sh\n"
+        f'real="{real}"\n'
+        'sub="$1"; [ $# -gt 0 ] && shift\n'
+        'case "$sub" in\n'
+        f'  feature_extractor) exec "$real" "$sub" --SiftExtraction.num_threads {threads} "$@" ;;\n'
+        f'  *_matcher) exec "$real" "$sub" --SiftMatching.num_threads {threads} "$@" ;;\n'
+        f'  mapper) exec "$real" "$sub" --Mapper.num_threads {threads} "$@" ;;\n'
+        '  *) exec "$real" "$sub" "$@" ;;\n'
+        "esac\n"
+    )
+    shim.chmod(0o755)
+    env["PATH"] = f"{bin_dir}{os.pathsep}{env.get('PATH', '')}"
 
 
 def _registration(data: Path, sampled_target: int) -> tuple[int, int]:

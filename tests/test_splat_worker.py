@@ -360,3 +360,52 @@ def test_splatfacto_stops_when_colmap_cannot_place_the_frames(tmp_path: Path, mo
     assert err.value.code == "camera_poses_failed"
     assert "only 2 of 12 frames" in err.value.message
     assert "ns-train" not in log.read_text()  # no wasted training
+
+
+def test_colmap_is_capped_to_the_threads_this_container_may_use(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A RunPod container saw 96 host cores and COLMAP's 96 SIFT threads were OOM-killed."""
+    import subprocess
+
+    from model.splat.splatfacto import _limit_colmap_threads, colmap_threads
+
+    log = _fake_tools(tmp_path / "bin", monkeypatch)
+    monkeypatch.setenv("SPLAT_COLMAP_THREADS", "6")
+    assert colmap_threads() == 6
+    env = dict(os.environ)
+    _limit_colmap_threads(tmp_path / "work", env)
+    for sub in ("feature_extractor", "sequential_matcher", "mapper", "model_converter"):
+        subprocess.run(["colmap", sub, "--database_path", "db"], env=env, check=True)
+    calls = log.read_text().splitlines()
+    assert "colmap feature_extractor --SiftExtraction.num_threads 6 --database_path db" in calls
+    assert "colmap sequential_matcher --SiftMatching.num_threads 6 --database_path db" in calls
+    assert "colmap mapper --Mapper.num_threads 6 --database_path db" in calls
+    assert "colmap model_converter --database_path db" in calls
+
+    monkeypatch.delenv("SPLAT_COLMAP_THREADS")
+    assert 1 <= colmap_threads() <= 16
+
+
+def test_splatfacto_trains_on_the_largest_colmap_model(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """COLMAP split IMG_1299 into models of 4, 88 and 216 frames; Nerfstudio only reads sparse/0."""
+    from model.splat.splatfacto import colmap_models, train_splatfacto
+
+    log = _fake_tools(tmp_path / "bin", monkeypatch)
+    process = tmp_path / "bin" / "ns-process-data"
+    # First call: COLMAP leaves three models. --skip-colmap call: transforms from the chosen one.
+    process.write_text(
+        "#!/bin/sh\n" + _LOG + _ARG
+        + 'mkdir -p "$out/images"; for i in $(seq 1 12); do echo x > "$out/images/f$i.png"; done\n'
+        'model=""; prev=""; for a in "$@"; do [ "$prev" = "--colmap-model-path" ] && model="$a"; prev="$a"; done\n'
+        'if [ -z "$model" ]; then for m in 0:2 1:5 2:10; do d="$out/colmap/sparse/${m%%:*}"; mkdir -p "$d";'
+        ' python3 -c "import sys; open(sys.argv[1],\'wb\').write(int(sys.argv[2]).to_bytes(8,\'little\'))" "$d/images.bin" "${m##*:}"; done; n=2;'
+        ' else n=10; fi\n'
+        'frames=""; for i in $(seq 1 $n); do frames="$frames{\\"file_path\\": \\"images/f$i.png\\"},"; done\n'
+        'printf "{\\"frames\\": [%s]}" "${frames%,}" > "$out/transforms.json"\n'
+    )
+    reports: list[tuple[str, int]] = []
+    train_splatfacto(_video(tmp_path), tmp_path / "work", report=lambda s, p: reports.append((s, p)),
+                     frames=12, steps=1000, min_bytes=10)
+    assert colmap_models(tmp_path / "work" / "ns_data") == {"0": 2, "1": 5, "2": 10}
+    calls = log.read_text()
+    assert "--skip-colmap --colmap-model-path colmap/sparse/2" in calls
+    assert "Poses ready (10 of 12 frames)" in [stage for stage, _ in reports]
