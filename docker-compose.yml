@@ -1,11 +1,19 @@
-# Full stack: web platform + API, reconstruction worker, PostgreSQL, Redis.
+# Production-style stack. Each concern runs in its own container:
 #
-#   cp .env.example .env        # then change POSTGRES_PASSWORD
-#   docker compose up --build
+#   api             the whole web app (FastAPI, web platform, walk viewer)     :8000
+#   postgres        job and project database
+#   redis           wakes workers when a job arrives (optional)
+#   worker          CPU mesh pipeline (Phases 1–9)
+#   worker-gateway  token-protected API for remote GPU workers                 :8001  (profile: gpu)
+#   gpu-worker      photoreal splat trainer on a local NVIDIA GPU                      (profile: gpu)
+#
+#   cp .env.example .env        # change POSTGRES_PASSWORD, set WORKER_TOKEN for the gpu profile
+#   docker compose up -d --build
 #   open http://localhost:8000
+#   docker compose --profile gpu up -d --build   # adds the gateway and a local GPU worker
 #
-# Uploads, frames, meshes, and studio documents live in ./data on the host, shared by the
-# api and worker containers. The GPU splat trainer is not part of this stack.
+# Uploads, frames, meshes, splats and studio documents live in ./data on the host, shared by
+# the api and worker containers. The database lives in the postgres_data volume.
 
 name: ai-indoor-3d-reconstruction
 
@@ -107,8 +115,38 @@ services:
       - ./data:/app/data
     networks: [reconstruction]
 
+  # Trains splats on this machine's NVIDIA GPU (needs the NVIDIA Container Toolkit). A rented
+  # GPU elsewhere runs the same image with WORKER_GATEWAY_URL pointing at your tunnel instead.
+  gpu-worker:
+    profiles: [gpu]
+    build:
+      context: .
+      target: gpu-worker
+    image: indoor3d-gpu-worker:latest
+    container_name: reconstruction-gpu-worker
+    restart: unless-stopped
+    depends_on:
+      worker-gateway: { condition: service_started }
+    environment:
+      WORKER_GATEWAY_URL: http://worker-gateway:8001
+      WORKER_TOKEN: ${WORKER_TOKEN:-}
+      WORKER_NAME: ${WORKER_NAME:-local-gpu}
+      SPLAT_TRAIN_STEPS: ${SPLAT_TRAIN_STEPS:-30000}
+      SPLAT_NUM_FRAMES: ${SPLAT_NUM_FRAMES:-300}
+    volumes:
+      - splat_work:/work
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks: [reconstruction]
+
 volumes:
   postgres_data:
+  splat_work:
   model_cache:
 
 networks:

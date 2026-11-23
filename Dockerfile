@@ -1,11 +1,13 @@
 # syntax=docker/dockerfile:1.7
 #
-# Two images from one file:
-#   docker build --target api    -t indoor3d-api .     FastAPI + web platform (small, no ML)
-#   docker build --target worker -t indoor3d-worker .  Phases 1–9 mesh pipeline on CPU
+# Three images from one file:
+#   docker build --target api        -t indoor3d-api .         the whole web app: FastAPI + web platform + walk viewer
+#   docker build --target worker     -t indoor3d-worker .      Phases 1–9 mesh pipeline on CPU
+#   docker build --target gpu-worker -t indoor3d-gpu-worker .  photoreal splats (COLMAP + Nerfstudio) on an NVIDIA GPU
 #
-# The Gaussian-splat trainer needs CUDA + COLMAP and stays on a GPU host / Colab
-# (see notebooks/). It is not built here.
+# PostgreSQL and Redis run from their official images (see docker-compose.yml). The GPU worker
+# can run next to the app (compose profile "gpu") or on a rented GPU (RunPod, Colab) that reaches
+# the app through api.worker_gateway; see docs in README.md → "Photoreal splats".
 
 ARG PYTHON_VERSION=3.10
 
@@ -66,3 +68,48 @@ ENV HF_HOME=/app/.cache/huggingface \
 RUN mkdir -p /app/data /app/.cache/huggingface && chown -R app:app /app/data /app/.cache
 USER app
 CMD ["python", "-m", "queue.workers", "--pipeline", "mesh"]
+
+# ---------------------------------------------------------------------------------------------
+# Photoreal Gaussian splats: ffmpeg → COLMAP → Nerfstudio splatfacto → PLY, reported to the app
+# through the worker gateway. Needs an NVIDIA GPU with ≥ 16 GB (RTX 4090 / A6000 / L4 / A100).
+FROM nvidia/cuda:12.4.1-devel-ubuntu22.04 AS gpu-worker
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    QT_QPA_PLATFORM=offscreen \
+    # gsplat's CUDA kernels are compiled once at build time for these GPU generations
+    # (T4 7.5, A100 8.0, A6000/3090 8.6, L4/4090 8.9, H100 9.0) instead of at every start.
+    TORCH_CUDA_ARCH_LIST="7.5;8.0;8.6;8.9;9.0" \
+    TORCH_EXTENSIONS_DIR=/opt/torch_extensions \
+    MAX_JOBS=4 \
+    SPLAT_BACKEND=splatfacto \
+    SPLAT_NUM_FRAMES=300 \
+    SPLAT_TRAIN_STEPS=30000 \
+    SPLAT_MAX_SIDE=1600 \
+    SPLAT_WORK_DIR=/work
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      python3 python3-pip python3-dev git build-essential ninja-build \
+      colmap ffmpeg libgl1 libglib2.0-0 \
+ && rm -rf /var/lib/apt/lists/* \
+ && ln -sf /usr/bin/python3 /usr/local/bin/python
+RUN pip install torch==2.4.1 torchvision==0.19.1 --index-url https://download.pytorch.org/whl/cu124 \
+ # Ubuntu ships blinker without pip metadata, which makes the nerfstudio install fail.
+ && pip install --ignore-installed blinker \
+ && pip install nerfstudio \
+ && cd /tmp && python -c "from gsplat.cuda._backend import _C; print('gsplat kernels built')"
+WORKDIR /app
+COPY pyproject.toml README.md ./
+COPY model ./model
+COPY database ./database
+COPY queue ./queue
+COPY shared ./shared
+COPY api ./api
+RUN pip install --no-deps -e . && pip install httpx "sqlalchemy>=2" \
+ && groupadd --system app && useradd --system --gid app --home /app --shell /usr/sbin/nologin app \
+ && mkdir -p /work && chown -R app:app /work /opt/torch_extensions
+USER app
+# Needs WORKER_GATEWAY_URL and WORKER_TOKEN (the app's api.worker_gateway).
+CMD ["python", "-m", "queue.workers", "--pipeline", "splat"]
