@@ -149,13 +149,22 @@
       const [axis, sign] = AXES[resolvedUp];
       const extent = Math.max(...ext, 1e-3);
       const center = lo.map((l, k) => 0.5 * (l + hi[k]));
-      const eye = [...center];
-      const floor = sign > 0 ? lo[axis] : hi[axis];
-      eye[axis] = floor + sign * 0.42 * ext[axis]; // standing eye height
       const horizontal = [0, 1, 2].filter((k) => k !== axis);
       const long = ext[horizontal[0]] >= ext[horizontal[1]] ? horizontal[0] : horizontal[1];
-      // Start near one end of the long side, looking down the room.
-      eye[long] = center[long] - 0.3 * ext[long];
+      let eye;
+      let focus = center;
+      const inside = [0, 1, 2].every((k) => lo[k] < 0 && hi[k] > 0);
+      if (resolvedUp === "+z" && inside) {
+        // Nerfstudio centres the scene on the camera path, so the origin is where (and at the
+        // height) the phone was held. Floaters outside the room make the bounding box a poor guide.
+        eye = [0, 0, 0];
+        focus = [0, 0, 0]; // orbit and tour around the walked path, not the floaters
+      } else {
+        eye = [...center];
+        const floor = sign > 0 ? lo[axis] : hi[axis];
+        eye[axis] = floor + sign * 0.42 * ext[axis]; // standing eye height
+        eye[long] = center[long] - 0.3 * ext[long];  // near one end, looking down the room
+      }
       const up = new THREE.Vector3(); up.setComponent(axis, sign);
       const fwd = new THREE.Vector3(); fwd.setComponent(long, 1);
       setBasis(up, fwd);
@@ -169,7 +178,7 @@
       cam.updateProjectionMatrix();
       cam.position.set(...eye);
       applyLook();
-      home = { position: cam.position.clone(), yaw, pitch, center: new THREE.Vector3(...center), extent };
+      home = { position: cam.position.clone(), yaw, pitch, center: new THREE.Vector3(...focus), extent };
       if (orbit) { orbit.target.copy(home.center); }
       return resolvedUp;
     }
