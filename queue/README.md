@@ -1,10 +1,21 @@
 # queue
 
-Asynchronous job processing.
+The worker process. The API only saves the video and marks the job queued.
 
 **Phase:** 12  
-**Status:** placeholder
+**Status:** implemented
 
-Redis is declared in Compose as the broker. The worker library (Celery or an alternative) is chosen in Phase 12 after comparing operational fit.
+The queue of record is the `jobs` table from Phase 11. The worker claims the oldest queued row. On this laptop it polls that table, so Redis does not have to be running.
 
-`workers/` will host the process that dequeues jobs and calls `model/`.
+When `REDIS_URL` is set, the API also pushes the job id to Redis and the worker waits on that list. That needs:
+
+```bash
+pip install -e ".[queue]"
+```
+
+```bash
+python -m queue.workers --once --pipeline mesh
+python -m queue.workers --pipeline splat
+```
+
+`mesh` runs Phases 1–9 on this machine. `splat` is the CUDA trainer and stays a different process from the API.

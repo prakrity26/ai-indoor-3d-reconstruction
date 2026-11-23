@@ -4,7 +4,7 @@ A modular system for 3D scene reconstruction and spatial understanding from mono
 
 This repository is an internship engineering project. The reconstruction engine is designed as a reusable module that a company application can call through a REST API, without depending on the Streamlit UI or on internal pipeline details.
 
-**Current status:** Phases 1–9 are implemented (video → frames → pose → depth → cloud → mesh → object labels → evaluation). Sample mesh outputs are in [`samples/img7916/`](samples/README.md) from clip `IMG_7916`. A walkable Gaussian splat for the same clip is trained on Colab and is not stored in git until the PLY is saved. API, database, queue, and the Streamlit product UI are still ahead.
+**Current status:** Phases 1–13 are implemented (reconstruction, labels, evaluation, API, SQLite job status, a separate worker, and the scene UI). Sample mesh outputs are in [`samples/img7916/`](samples/README.md) from clip `IMG_7916`. A walkable Gaussian splat for the same clip is trained on Colab and is not stored in git until the PLY is saved. Docker and the final write-up are still ahead.
 
 ## Review
 
@@ -17,7 +17,7 @@ Progress log: **[PROGRESS.md](PROGRESS.md)** (work through Phases 1–7). Sample
 | Code through week 05 / Phases 1–7 | `model/` (preprocessing → mesh) |
 | Mesh output (orbit) | `samples/img7916/mesh.glb` |
 | Filtered point cloud | `samples/img7916/cloud_filtered.ply` |
-| How to open the mesh | `python -m ui.demo --job-id img7916` |
+| How to open the product UI | `python -m api` then http://127.0.0.1:8000/ |
 | Optional splat training | `notebooks/colab_gaussian_splat.ipynb` then `python -m ui.splat_demo` |
 
 After clone:
@@ -133,10 +133,10 @@ Work proceeds **one phase at a time**. Do not start the next phase until the cur
 | 7 | Mesh reconstruction and GLB/PLY export | implemented |
 | 8 | Object detection and scene understanding | done |
 | 9 | Evaluation and benchmarking | done |
-| 10 | FastAPI service |
-| 11 | Database |
-| 12 | Queue and asynchronous workers |
-| 13 | Streamlit UI |
+| 10 | FastAPI service | done |
+| 11 | Database | done |
+| 12 | Queue and asynchronous workers | done |
+| 13 | Streamlit UI | done |
 | 14 | Docker and Compose hardening |
 | 15 | Testing, optimization, production hardening |
 | 16 | Final documentation and internship deliverables |

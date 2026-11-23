@@ -15,7 +15,10 @@ This file is the public progress note. Detailed daily/weekly notes stay in the l
 | Walkable Gaussian splat (`IMG_7916`) | Training on Colab GPU; PLY not in the repo yet |
 | Phase 8 object labels (`scene.json`) | Done locally; YOLO weights are an optional extra |
 | Phase 9 evaluation (`evaluation.json`) | Done locally; scores the files already on disk |
-| Phases 10–16 (API, database, queue, Streamlit, Docker, docs) | Not started |
+| Phase 10 API and Phase 13 scene UI | Done locally; the page lists the sample mesh and new uploads |
+| Phase 11 job database | Done locally; SQLite by default, Postgres when DATABASE_URL is set |
+| Phase 12 worker | Done locally; the database is the queue, Redis is an optional wake-up |
+| Phases 14–16 (Docker, hardening, final docs) | Not started |
 
 ## What the sample output is
 

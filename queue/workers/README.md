@@ -1,9 +1,10 @@
 # Worker
 
-One process on the NVIDIA GPU. It claims queued uploads and calls `model.splat`. Each video is its own scene.
+One process, separate from the API.
 
 ```bash
-python -m queue.workers
+python -m queue.workers --once --pipeline mesh
+python -m queue.workers --pipeline splat
 ```
 
-`--once` trains whatever is already queued, then exits. The API must stay a different process so an upload request never runs training.
+`mesh` reconstructs on this Mac. `splat` trains on an NVIDIA GPU. `--once` finishes the queued jobs and exits. An upload request never calls either pipeline.

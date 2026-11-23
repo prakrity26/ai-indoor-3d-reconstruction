@@ -18,6 +18,8 @@
       background: rgba(0,0,0,.35); align-items: center; justify-content: center;
       font-size: 1.1rem; cursor: pointer;
     }
+    body.embed #hud { left: 50%; right: auto; top: auto; bottom: 16px; transform: translateX(-50%); text-align: center; }
+    body.embed #hud strong, body.embed #pick { display: none; }
   </style>
   <script type="importmap">
   {
@@ -34,7 +36,7 @@
     <strong>Walkable Gaussian splat</strong>
     Click the view, then move with <b>W A S D</b>. Mouse looks around. Esc releases the mouse.
     <p id="status">Waiting for a splat PLY…</p>
-    <p><input id="file" type="file" accept=".ply,.splat" /></p>
+    <p id="pick"><input id="file" type="file" accept=".ply,.splat" /></p>
   </div>
   <div id="blocker">Click to walk</div>
   <script type="module">
@@ -161,18 +163,28 @@
       }
     });
 
-    const plyUrl = new URLSearchParams(location.search).get("ply") || "/splat.ply";
-    fetch(plyUrl)
-      .then((r) => {
-        if (!r.ok) return;
-        return loadSplat("/splat.ply", GaussianSplats3D.SceneFormat.Ply);
-      })
-      .catch((err) => {
-        console.error(err);
-        if (status.textContent.startsWith("Loading")) {
-          status.textContent = "Could not load this splat: " + (err && err.message ? err.message : err);
-        }
-      });
+    const params = new URLSearchParams(location.search);
+    if (params.get("embed") === "1") document.body.classList.add("embed");
+    const requested = params.get("ply") || "";
+    const plyUrl = requested.startsWith("/") ? requested : "";
+    if (!plyUrl) {
+      status.textContent = "Drop a point_cloud.ply, or open Walk from the scene list.";
+    } else {
+      fetch(plyUrl)
+        .then((response) => {
+          if (!response.ok) {
+            status.textContent = "This scene has no walkable splat yet.";
+            return;
+          }
+          return loadSplat(plyUrl, GaussianSplats3D.SceneFormat.Ply);
+        })
+        .catch((err) => {
+          console.error(err);
+          if (status.textContent.startsWith("Loading")) {
+            status.textContent = "Could not load this splat: " + (err && err.message ? err.message : err);
+          }
+        });
+    }
   </script>
 </body>
 </html>

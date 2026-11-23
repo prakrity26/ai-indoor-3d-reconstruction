@@ -20,6 +20,12 @@ Phase 8: `test_scene.py` places one box through depth and pose. `test_scene_unde
 
 Phase 9: `test_evaluation.py` scores pose coverage, cloud and mesh counts, timings, and keeps a small splat marked sparse.
 
+API and UI: `test_api_ui.py` lists the sample mesh, downloads the GLB, and reads the evaluation counts. `test_jobs.py` still checks that an upload is trained by the worker, not by the request.
+
+Phase 11: `test_database.py` stores job status in SQLite, claims the next queued job, and refuses a Postgres URL until the database extra is installed.
+
+Phase 12: `test_queue.py` keeps the database as the queue, reports a missing Redis server, and lets a mesh job finish without a splat.
+
 Splat path: `test_splat.py` prepares overlapping JPEGs in this repo and checks COLMAP TXT parsing. Training is CUDA-only (Colab) and is not run in pytest.
 
 ```bash

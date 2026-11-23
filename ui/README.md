@@ -1,25 +1,31 @@
 # ui
 
-Streamlit client for operators and demos.
+The product page is the interactive studio served by the API. The scene fills the screen. Orbit turns the mesh. Walk moves through a splat with W A S D. Streamlit is a second client that calls the same API.
 
-**Phase:** 13 (operator UI still a placeholder)  
-**Status:** local mid-defense preview added
+**Phase:** 13  
+**Status:** studio page and Streamlit client
 
-This package will later upload video, poll job status, and embed an interactive 3D viewer. It must call the API only. It must not import `model/` or run reconstruction locally.
+Neither client imports `model/` or runs reconstruction.
 
-Until Phase 13, use the local preview of an **already reconstructed** job (does not run the engine):
+```bash
+pip install -e ".[api]"
+python -m api
+```
+
+Open http://127.0.0.1:8000/. The sample mesh has an Orbit button. Walk appears after a splat file exists.
+
+Streamlit, against that API:
+
+```bash
+pip install -e ".[ui]"
+streamlit run ui/app.py
+```
+
+`API_URL` defaults to http://127.0.0.1:8000.
+
+Local previews that do not use the API:
 
 ```bash
 python -m ui.demo --job-id img7916
-```
-
-That opens a browser with selected frames and `mesh.glb`. Orbit with the mouse. Internet is needed once so the 3D viewer library can load.
-
-If the browser is empty, drag `samples/img7916/mesh.glb` onto the file input on the page.
-
-Walkable splat (needs `point_cloud.ply` from Colab):
-
-```bash
 python -m ui.splat_demo --job-id img7916
 ```
-

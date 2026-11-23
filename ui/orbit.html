@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Orbit mesh</title>
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
+  <style>
+    html, body { margin: 0; height: 100%; background: #0d0f14; color: #eee; font-family: system-ui, sans-serif; }
+    header { padding: 12px 16px; background: #171a22; }
+    header a { color: #d5def6; }
+    header p { margin: 4px 0 0; color: #9aa3b5; font-size: 0.9rem; }
+    model-viewer { width: 100%; height: calc(100% - 64px); background: #0d0f14; }
+    body.embed header { display: none; }
+    body.embed model-viewer { height: 100%; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/">All scenes</a>
+    <p id="note">Drag to orbit. Scroll to zoom. Distances are relative, not metres.</p>
+  </header>
+  <model-viewer id="viewer" camera-controls touch-action="pan-y" shadow-intensity="0.6" exposure="1.05" alt="Reconstructed indoor mesh"></model-viewer>
+  <script>
+    const params = new URLSearchParams(location.search);
+    if (params.get("embed") === "1") document.body.classList.add("embed");
+    const mesh = params.get("mesh") || "";
+    const note = document.getElementById("note");
+    if (!mesh.startsWith("/jobs/")) {
+      note.textContent = "Open a scene from the list to orbit its mesh.";
+    } else {
+      document.getElementById("viewer").src = mesh;
+    }
+  </script>
+</body>
+</html>

@@ -1,14 +1,18 @@
 # database
 
-Job metadata and result persistence.
+Job status for the API and the worker.
 
 **Phase:** 11  
-**Status:** placeholder
+**Status:** implemented
 
-Planned layout:
+The video file and the splat stay on disk. The database stores the job id, status, filename, paths, and error.
 
-- `models/` — ORM / table definitions
-- `repositories/` — query helpers used by API and worker
-- `migrations/` — schema versions
+On this laptop the table is SQLite at `data/jobs/index.sqlite`. That is the default, so the API runs without Postgres.
 
-PostgreSQL is declared in Compose. No tables or SQLAlchemy code in Phase 0.
+PostgreSQL uses the same table when `DATABASE_URL` starts with `postgresql://`. That needs the driver:
+
+```bash
+pip install -e ".[db]"
+```
+
+Schema version: `database/migrations/001_jobs.sql`. Tests use a temporary SQLite file and do not start Postgres.
