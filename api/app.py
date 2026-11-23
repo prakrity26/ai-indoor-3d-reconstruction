@@ -29,7 +29,7 @@ from api.artifacts import (
     valid_job_id,
 )
 from shared.config.settings import load_settings
-from shared.jobs import JobStore, UploadTooLarge
+from shared.jobs import JobStore, UploadTooLarge, default_store
 from shared.stdlib_queue import ensure_stdlib_queue
 
 ensure_stdlib_queue()
@@ -50,20 +50,12 @@ _VIDEO_TYPES = {
 }
 
 
-def _default_job_store() -> JobStore:
-    root = Path(os.environ.get("JOBS_DIR", "data/jobs"))
-    url = os.environ.get("DATABASE_URL", "").strip()
-    if url.startswith("postgres"):
-        return JobStore(root, database_url=url)
-    return JobStore(root)
-
-
 def _output_dir() -> Path:
     return Path(os.environ.get("OUTPUT_DIR", "./data/outputs"))
 
 
 def create_app(store: JobStore | None = None, *, include_library: bool = False) -> FastAPI:
-    jobs = store or _default_job_store()
+    jobs = store or default_store()
     app = FastAPI(title="Indoor 3D reconstruction", version=API_VERSION)
     app.state.jobs = jobs
 

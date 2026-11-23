@@ -17,12 +17,13 @@ This file is the public progress note. Detailed daily/weekly notes stay in the l
 | Phase 11 job database | Done; SQLite by default, Postgres via `DATABASE_URL`, versioned migrations |
 | Phase 12 worker | Done; per-stage progress, retry, crash/stop recovery |
 | Phase 13 web platform | Done; Dashboard, My projects, Create project, Processing jobs, 3D Studio, Shared scenes, Settings |
-| Phase 14 Docker | Done; `api` and `worker` images, Compose with Postgres and Redis |
+| Phase 14 Docker | Done; `api`, `worker` and `gpu-worker` images, Compose with Postgres, Redis and a `gpu` profile |
 | Phase 15 hardening and CI | Done; streamed uploads with limits, security headers, stale-job recovery, GitHub Actions |
 | Phase 16 documentation | Done; README, module READMEs, this log |
 | Sample mesh + filtered cloud | `samples/img7916/` (Git LFS), from clip `IMG_7916` |
-| Remote GPU splat worker | Done; worker gateway + `colab_gpu_worker.ipynb` (splatfacto), progress in the UI, Walk mode in Studio and share page |
-| Walkable Gaussian splat (`IMG_7916`) | Next: run the Colab worker on the IMG_7916 upload |
+| Remote GPU splat worker | Done; worker gateway, RunPod or Colab, progress and notifications in the UI |
+| Walkable Gaussian splat | Done; `samples/img1299/` (Git LFS), 561k Gaussians from an iPhone video, first-person walk viewer |
+| `IMG_7916` splat | COLMAP could not place enough frames of this vertical clip; superseded by `IMG_1299` |
 
 ## What the sample output is
 
@@ -61,7 +62,9 @@ Scale is **relative** (not metric). The mesh can look incomplete or ballooned. T
 
 ## Optional splat path
 
-Same repository, `model/splat` + `notebooks/colab_gaussian_splat.ipynb`. Mac prepares frames; Colab (CUDA + COLMAP + gsplat) trains. Walk viewer: `python -m ui.splat_demo` after `point_cloud.ply` exists.
+A GPU worker (RunPod, the `gpu-worker` image, or Colab) trains splats with Nerfstudio splatfacto
+and uploads them through the worker gateway. `samples/img1299/` is a finished 561k-Gaussian splat
+(RTX 4090, ~7 minutes of training). See `model/splat/README.md`.
 
 ## How to review the delivery
 
@@ -71,4 +74,4 @@ Same repository, `model/splat` + `notebooks/colab_gaussian_splat.ipynb`. Mac pre
 4. Upload a short room video on Create project and run `python -m queue.workers --pipeline mesh`; watch Processing jobs.
 5. Or run everything with `docker compose up --build`.
 6. `pytest` runs the test suite.
-7. Treat the splat as in progress until the Colab PLY is copied into `samples/` and pushed.
+7. Walk through the photoreal sample: open *Sample room (IMG_1299)* and choose **Walk the room** (`git lfs pull` first).

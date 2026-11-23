@@ -64,7 +64,7 @@ def reconstruct_gaussian_splat(
             SplatIssue(
                 "info",
                 "prepare_only",
-                "Frames are ready. Open notebooks/colab_gaussian_splat.ipynb on a GPU runtime to train.",
+                "Frames are ready. Train them on a GPU worker (python -m queue.workers --pipeline splat).",
             )
         )
     else:

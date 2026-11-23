@@ -9,7 +9,6 @@ from fastapi.testclient import TestClient
 
 from api.app import create_app
 from shared.jobs import JobStore
-from ui.board import describe
 
 
 def test_sample_mesh_is_listed_and_downloadable(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -24,7 +23,6 @@ def test_sample_mesh_is_listed_and_downloadable(monkeypatch: pytest.MonkeyPatch,
     assert sample["summary"]["mesh_vertices"] == 17187
     assert sample["summary"]["posed_frames"] == 17
     assert sample["summary"]["selected_frames"] == 70
-    assert describe(sample) == "succeeded · 17/70 posed · 17187 vertices · mesh ready"
 
     mesh = client.get("/jobs/img7916/mesh.glb")
     assert mesh.status_code == 200

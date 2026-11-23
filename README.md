@@ -223,7 +223,7 @@ python -m model.scene_understanding data/frames/<job_id>   # 8 object labels (.[
 python -m model.evaluation data/frames/<job_id>            # 9 evaluation.json
 ```
 
-Gaussian splat (CUDA): prepare frames on the Mac with `python -m model.splat <video> --job-id <id> --prepare-only`, train with [`notebooks/colab_gaussian_splat.ipynb`](notebooks/README.md), or run `python -m queue.workers --pipeline splat` on a CUDA host.
+Gaussian splats need an NVIDIA GPU and run in a GPU worker (`python -m queue.workers --pipeline splat`); see [Photoreal splats on a GPU](#photoreal-splats-on-a-gpu) and [`model/splat/`](model/splat/README.md).
 
 **Scale is relative**, not metres: monocular video has no metric scale.
 
@@ -231,17 +231,18 @@ Gaussian splat (CUDA): prepare frames on the Mac with `python -m model.splat <vi
 
 ```bash
 pip install -e ".[dev,api,db,queue,cloud]"
-pytest
+python -m ruff check .
+python -m pytest -q
 ```
 
-CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs the test suite, syntax-checks the frontend modules, and builds and smoke-tests the API image.
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) lints, runs the test suite, syntax-checks the frontend modules, and builds and smoke-tests the API image. See [CONTRIBUTING.md](CONTRIBUTING.md) for conventions and where changes go.
 
 ## Repository layout
 
 ```text
 api/          FastAPI app, artifact lookup, studio document validation
 ui/web/       Web platform (index.html, share.html, assets/)
-ui/           Standalone mesh/splat viewers and a Streamlit client
+ui/           Walk viewer (splat_viewer.html) and mesh orbit viewer served by the API
 model/        Reconstruction engine (Phases 1–9) and the splat trainer
 database/     SQLAlchemy model, repository, versioned SQL migrations
 queue/        Worker entry point (python -m queue.workers)

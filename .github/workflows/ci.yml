@@ -13,14 +13,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          lfs: true  # tests read the sample mesh in samples/
+      # Only the small mesh sample. The 139 MB splat would use up the free LFS bandwidth.
+      - name: Fetch the mesh sample from Git LFS
+        run: git lfs pull --include "samples/img7916/*"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
           cache: pip
       - name: Install (no PyTorch; depth tests use stubs)
         run: pip install ".[dev,api,db,queue,cloud]"
+      - name: Lint
+        run: python -m ruff check .
       - name: Run tests
         run: python -m pytest -q
 
@@ -38,8 +41,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          lfs: true
+      - name: Fetch the mesh sample from Git LFS
+        run: git lfs pull --include "samples/img7916/*"
       - name: Validate compose file
         run: docker compose config -q
       - name: Build the api image

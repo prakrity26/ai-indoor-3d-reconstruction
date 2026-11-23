@@ -27,16 +27,10 @@ from shared.stdlib_queue import ensure_stdlib_queue
 ensure_stdlib_queue()
 
 from api.artifacts import frames_root, valid_job_id  # noqa: E402
-from shared.jobs import JobStore  # noqa: E402
+from shared.jobs import JobStore, default_store  # noqa: E402
 
 MIN_TOKEN_LENGTH = 24
 _PLY_MAGIC = b"ply"
-
-
-def _default_store() -> JobStore:
-    root = Path(os.environ.get("JOBS_DIR", "data/jobs"))
-    url = os.environ.get("DATABASE_URL", "").strip()
-    return JobStore(root, database_url=url) if url.startswith("postgres") else JobStore(root)
 
 
 def create_worker_app(store: JobStore | None = None, *, token: str | None = None) -> FastAPI:
@@ -46,7 +40,7 @@ def create_worker_app(store: JobStore | None = None, *, token: str | None = None
             f"WORKER_TOKEN must be set to a random value of at least {MIN_TOKEN_LENGTH} characters. "
             'Generate one with: python -c "import secrets; print(secrets.token_urlsafe(32))"'
         )
-    jobs = store or _default_store()
+    jobs = store or default_store()
     max_bytes = int(os.environ.get("SPLAT_MAX_UPLOAD_MB", "3000")) * 1024 * 1024
     stale_minutes = float(os.environ.get("SPLAT_STALE_MINUTES", "20"))
     app = FastAPI(title="Indoor 3D worker gateway", docs_url=None, redoc_url=None, openapi_url=None)

@@ -39,13 +39,7 @@ Indoor clip `IMG_7916` reconstructed through Phases 1–7 (mesh path). OpenCV po
 
 Relative monocular scale. Not a walkable photoreal splat.
 
-### View on a laptop
-
-```bash
-python -m ui.demo --job-id img7916
-```
-
-Opens http://127.0.0.1:8765/ (mesh orbit). Works from this `samples/` copy after a GitHub clone.
+It appears on the dashboard as *Sample room (IMG_7916)*; open it in the 3D Studio to orbit the mesh.
 
 COLMAP could place only a handful of this vertical clip's frames, so it has no splat. The
 landscape `img_1299` capture above is the walkable example.

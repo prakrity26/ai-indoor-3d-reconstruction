@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import inspect
 import logging
 import os
@@ -9,9 +10,10 @@ import re
 import secrets
 import shutil
 import time
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, BinaryIO, Callable
+from typing import Any, BinaryIO
 
 from database.repositories.jobs import JobRepository
 from database.session import sqlite_url
@@ -276,10 +278,9 @@ def process_next(store: JobStore, train: Callable) -> bool:
         if _accepts_report(train):
 
             def report(stage: str, progress: int) -> None:
-                try:
+                # Progress is best effort; never fail a job over it.
+                with contextlib.suppress(Exception):
                     store.report(job_id, stage, progress)
-                except Exception:  # progress is best effort; never fail a job over it
-                    pass
 
             kwargs["report"] = report
         result = train(job["source_path"], **kwargs)

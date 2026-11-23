@@ -157,7 +157,7 @@ def test_nearby_labels_merge_and_distant_ones_stay_apart(tmp_path: Path) -> None
     depth_dir.mkdir(parents=True)
     maps = []
     cameras = []
-    for index, frame, shift in ((0, first, 0.0), (1, second, 3.0)):
+    for _index, frame, shift in ((0, first, 0.0), (1, second, 3.0)):
         depth_path = depth_dir / f"{frame.stem}.npy"
         np.save(depth_path, np.full((8, 10), 2.0, dtype=np.float32))
         matrix = np.eye(4)

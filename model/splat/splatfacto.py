@@ -21,6 +21,7 @@ Needs a CUDA machine with ``pip install nerfstudio`` and ``apt-get install colma
 
 from __future__ import annotations
 
+import contextlib
 import glob
 import json
 import os
@@ -30,8 +31,8 @@ import signal
 import subprocess
 import threading
 from collections import deque
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from model.splat.exceptions import SplatError
 
@@ -402,7 +403,5 @@ def _kill_on_cancel(process: subprocess.Popen, cancel: threading.Event) -> None:
 
 
 def _signal_group(process: subprocess.Popen, sig: int) -> None:
-    try:
+    with contextlib.suppress(ProcessLookupError, PermissionError):
         os.killpg(os.getpgid(process.pid), sig)
-    except (ProcessLookupError, PermissionError):
-        pass

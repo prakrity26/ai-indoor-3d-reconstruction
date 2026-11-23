@@ -1,37 +1,43 @@
-# splat
+# model/splat
 
-**Path:** Gaussian splat (Captures-like appearance)  
-**Status:** in-repo engine; train on CUDA (Colab)
+Photoreal, walkable Gaussian splats. The mesh pipeline (Phases 1–9) runs on any machine; this
+package needs an NVIDIA GPU and runs inside a **GPU worker** (`python -m queue.workers --pipeline splat`).
 
-This package lives in **this** git repository. Google Colab is only a GPU. Do not start a second project.
+## Backends
 
-It does **not** replace the mesh path on your Mac. Those still produce `mesh.glb`. This path is the photoreal walkable output: COLMAP, undistorted frames, then 3D Gaussians.
+| Backend | Module | Status | Used by |
+|---|---|---|---|
+| `splatfacto` (default) | [`splatfacto.py`](splatfacto.py) | **Production.** Nerfstudio's standard phone-video recipe. | GPU worker, `gpu-worker` image, Colab notebook, RunPod |
+| `gsplat` | [`pipeline.py`](pipeline.py), [`train.py`](train.py), [`colmap.py`](colmap.py), [`prepare.py`](prepare.py) | Experimental in-repo trainer. Produced sparse ~1 MB clouds on phone video. | `--backend gsplat` only |
 
-The look of the room is decided when you film, before training. Captures Studio’s own routine is the reference: [Create 3D from smartphone video](https://www.captures.studio/blogs/how-to-create-3d-from-smartphone-video) and the [interactive capture tutorial](https://www.captures.studio/interactive-capture-tutorial). About five minutes, ultrawide, 4K if the phone has it, focus and exposure locked, then three slow loops of the same room (chest height, overhead looking down, knee height). A fast one-minute pan cannot become that result.
+## splatfacto pipeline
 
-## On your Mac (no NVIDIA GPU)
-
-```bash
-python -m model.splat data/uploads/your_room.mp4 --job-id room_splat --prepare-only
+```text
+video ─ffmpeg→ 300 frames ≤ 1600 px ─COLMAP→ camera poses ─ns-train→ 3D Gaussians ─ns-export→ point_cloud.ply
 ```
 
-That writes `data/frames/<job>/splat/images/`.
+`train_splatfacto()` reports each stage to the job (Processing jobs and the project page show it)
+and guards against what broke on real captures:
 
-## On Colab (GPU runtime)
+| Problem seen | Handling |
+|---|---|
+| COLMAP split the frames into several models and Nerfstudio read the smallest (`sparse/0`) | Rebuilds `transforms.json` from the largest model |
+| Too few frames placed (bad footage) | Stops before training with filming advice (`SPLAT_MIN_REGISTERED`, 30%) |
+| COLMAP OOM-killed on cloud pods that expose 96+ cores | Caps COLMAP threads (`SPLAT_COLMAP_THREADS`, ≤ 16) |
+| `ns-export` failed on PyTorch ≥ 2.6 (`weights_only`) | Sets `TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1` for its own checkpoints |
+| gsplat's CUDA build ran out of memory | `MAX_JOBS=2` (the `gpu-worker` image prebuilds the kernels) |
+| A disconnect lost an hour of work | With `SPLAT_KEEP_ROOT`, poses and checkpoints persist and the next run resumes |
 
-Open `notebooks/colab_gaussian_splat.ipynb` **from this repo**. The notebook clones or uploads **this** repository and runs:
+Settings (`.env.example`): `SPLAT_NUM_FRAMES`, `SPLAT_TRAIN_STEPS`, `SPLAT_MAX_SIDE`,
+`SPLAT_MIN_REGISTERED`, `SPLAT_COLMAP_THREADS`, `SPLAT_KEEP_ROOT`.
 
-```bash
-python -m model.splat /content/your_room.mp4 --job-id room_splat
-```
+## Running a worker
 
-Download `data/frames/<job>/splat/point_cloud.ply` and open it with `ui/splat_viewer.html`.
+See the root README, *Photoreal splats on a GPU*: a rented GPU (RunPod), the `gpu-worker` Docker
+image, or [`notebooks/colab_gpu_worker.ipynb`](../../notebooks/colab_gpu_worker.ipynb).
 
-## Outputs
+## Filming
 
-| Artifact | Location |
-|----------|----------|
-| Training images | `data/frames/<job>/splat/images/` |
-| COLMAP TXT | `data/frames/<job>/splat/colmap/sparse_txt/` |
-| Splat PLY | `data/frames/<job>/splat/point_cloud.ply` |
-| Manifest | `data/frames/<job>/splat/splat.json` |
+Training cannot fix footage COLMAP cannot place. Hold the phone horizontally, walk slowly along
+the walls looking into the room (never spin on the spot), keep furniture in every frame, stay a
+metre from surfaces, light the room well, and do two loops at different heights. 1–2 minutes is enough.

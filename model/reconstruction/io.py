@@ -13,10 +13,7 @@ def load_job_artifacts(source: str | Path) -> tuple[dict, dict, Path, str]:
     if not path.exists():
         raise ReconstructionError("source_not_found", f"Source not found: {path}")
 
-    if path.is_file():
-        job_dir = path.parent
-    else:
-        job_dir = path
+    job_dir = path.parent if path.is_file() else path
 
     poses_path = job_dir / "poses.json"
     depth_path = job_dir / "depth.json"

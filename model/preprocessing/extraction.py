@@ -20,10 +20,7 @@ def compute_stride(
     max_frames: int,
 ) -> int:
     """Uniform stride so extraction stays near target_fps and within max_frames."""
-    if target_fps <= 0 or source_fps <= 0:
-        stride = 1
-    else:
-        stride = max(1, int(round(source_fps / target_fps)))
+    stride = 1 if target_fps <= 0 or source_fps <= 0 else max(1, int(round(source_fps / target_fps)))
     if frame_count > 0:
         estimated = max(1, math.ceil(frame_count / stride))
         if estimated > max_frames:

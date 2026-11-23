@@ -219,7 +219,7 @@ def _recover_pair(
     if estimated is None:
         return None
     rotation_rel, translation_rel, inliers, kept = estimated
-    inlier_matches = [match for match, flag in zip(matches, kept) if flag]
+    inlier_matches = [match for match, flag in zip(matches, kept, strict=True) if flag]
     inlier_a = points_a[kept]
     inlier_b = points_b[kept]
     if len(inlier_matches) < settings.min_inliers:
@@ -243,7 +243,7 @@ def _recover_pair(
     if point_map:
         prior = []
         unit = []
-        for match, point in zip(inlier_matches, unit_world):
+        for match, point in zip(inlier_matches, unit_world, strict=True):
             mapped = point_map.get(match.queryIdx)
             if mapped is not None:
                 prior.append(mapped)
@@ -270,7 +270,7 @@ def _recover_pair(
         rotation, translation, world
     )
     new_map: dict[int, np.ndarray] = {}
-    for match, point, ok in zip(inlier_matches, world, depth_ok):
+    for match, point, ok in zip(inlier_matches, world, depth_ok, strict=True):
         if ok:
             new_map[match.trainIdx] = point
     return rotation, translation, inliers, len(matches), new_map, float(scale)

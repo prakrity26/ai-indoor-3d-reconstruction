@@ -1,1 +1,1 @@
-"""Streamlit UI (Phase 13)."""
+"""Web platform and viewers served by the API (Phase 13)."""

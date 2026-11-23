@@ -19,8 +19,9 @@ import shutil
 import socket
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
 log = logging.getLogger("reconstruction.splat_worker")
 

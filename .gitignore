@@ -88,3 +88,6 @@ logs/
 !samples/**/*.png
 !samples/**/*.json
 !samples/**/*.md
+
+# Local editor / assistant settings
+.claude/

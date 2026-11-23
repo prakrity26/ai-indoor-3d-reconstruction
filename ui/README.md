@@ -26,10 +26,11 @@ pip install -e ".[api]"
 python -m api            # http://127.0.0.1:8000
 ```
 
-## Other files
+## Viewers served by the API
 
-- `orbit.html`, `splat_viewer.html`: standalone viewers; the studio frames `splat_viewer.html` for Walk mode.
-- `app.py`: a small Streamlit client that calls the same API (`pip install -e ".[ui]"`, `streamlit run ui/app.py`).
-- `demo.py`, `splat_demo.py`: local previews without the API (`python -m ui.demo --job-id img7916`).
+| File | Route | Role |
+|---|---|---|
+| `splat_viewer.html` | `/viewer?ply=…` | First-person walk viewer for Gaussian splats (Walk mode, shared links, embeds) |
+| `orbit.html` | `/orbit` | Mesh orbit viewer used by the studio |
 
-None of these import `model/` or run reconstruction.
+Nothing in `ui/` imports `model/` or runs reconstruction.
