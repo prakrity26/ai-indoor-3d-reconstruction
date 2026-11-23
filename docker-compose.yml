@@ -1,13 +1,19 @@
-# Phase 0 service topology skeleton.
+# Full stack: web platform + API, reconstruction worker, PostgreSQL, Redis.
 #
-# Application images (ui, api, worker) are not built yet.
-# They will be added in Phases 10–14. Do not treat commented
-# services as running software.
+#   cp .env.example .env        # then change POSTGRES_PASSWORD
+#   docker compose up --build
+#   open http://localhost:8000
 #
-# Infrastructure images are declared so the intended production
-# layout is explicit: UI → API → (PostgreSQL, Redis, Worker).
+# Uploads, frames, meshes, and studio documents live in ./data on the host, shared by the
+# api and worker containers. The GPU splat trainer is not part of this stack.
 
 name: ai-indoor-3d-reconstruction
+
+x-app-env: &app-env
+  DATABASE_URL: postgresql://${POSTGRES_USER:-reconstruction}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-reconstruction}
+  REDIS_URL: redis://redis:6379/0
+  MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-500}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
 
 services:
   postgres:
@@ -18,8 +24,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-reconstruction}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
       POSTGRES_DB: ${POSTGRES_DB:-reconstruction}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -27,69 +31,61 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - reconstruction
+    networks: [reconstruction]
 
   redis:
     image: redis:7-alpine
     container_name: reconstruction-redis
     restart: unless-stopped
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - reconstruction
+    networks: [reconstruction]
 
-  # ui:
-  #   build: ./ui
-  #   container_name: reconstruction-ui
-  #   depends_on:
-  #     - api
-  #   ports:
-  #     - "${UI_PORT:-8501}:8501"
-  #   env_file:
-  #     - .env
-  #   networks:
-  #     - reconstruction
+  api:
+    build:
+      context: .
+      target: api
+    image: indoor3d-api:latest
+    container_name: reconstruction-api
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    environment:
+      <<: *app-env
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - ./data:/app/data
+    networks: [reconstruction]
 
-  # api:
-  #   build: ./api
-  #   container_name: reconstruction-api
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     redis:
-  #       condition: service_healthy
-  #   ports:
-  #     - "${API_PORT:-8000}:8000"
-  #   env_file:
-  #     - .env
-  #   volumes:
-  #     - ./data:/app/data
-  #   networks:
-  #     - reconstruction
-
-  # worker:
-  #   build: ./model
-  #   container_name: reconstruction-worker
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     redis:
-  #       condition: service_healthy
-  #   env_file:
-  #     - .env
-  #   volumes:
-  #     - ./data:/app/data
-  #   networks:
-  #     - reconstruction
+  worker:
+    build:
+      context: .
+      target: worker
+    image: indoor3d-worker:latest
+    container_name: reconstruction-worker
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      api: { condition: service_healthy }
+    environment:
+      <<: *app-env
+      COMPUTE_DEVICE: cpu
+    volumes:
+      - ./data:/app/data
+      - model_cache:/app/.cache/huggingface
+    networks: [reconstruction]
 
 volumes:
   postgres_data:
+  model_cache:
 
 networks:
   reconstruction:
