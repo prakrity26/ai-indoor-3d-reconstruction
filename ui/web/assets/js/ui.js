@@ -59,6 +59,9 @@ const ICONS = {
   sun: "M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zM12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4",
   save: "M5 3h11l5 5v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM7 3v5h8M7 21v-7h10v7",
   flip: "M12 3v18M7 8l5-5 5 5M7 16l5 5 5-5",
+  bell: "M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0",
+  compass: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM16.2 7.8l-2.1 6.3-6.3 2.1 2.1-6.3z",
+  wifiOff: "M2 2l20 20M8.5 16.5a5 5 0 0 1 7 0M5 13a10 10 0 0 1 5.2-2.8M19 13a10 10 0 0 0-2-1.5M2 8.8a15 15 0 0 1 4.2-2.6M22 8.8A15 15 0 0 0 10.7 5M12 20h.01",
 };
 
 export function icon(name, size = 18) {
@@ -136,16 +139,43 @@ export function formatNumber(n) {
 }
 
 // ---- toast / modal ------------------------------------------------------------------------------
-export function toast(message, kind = "info") {
+const TOAST_ICON = { error: "alert", warning: "alert", success: "check", info: "info", progress: "activity" };
+const MAX_TOASTS = 4;
+
+/**
+ * Show a short message in the corner.
+ *   toast("Saved", "success")
+ *   toast("Living room is ready", "success", { title: "Processing finished", action: { label: "Open", onClick }, duration: 8000 })
+ * kind: info | success | warning | error | progress. duration 0 keeps it until closed.
+ * Hovering pauses the timer so there is time to read it. Returns a function that closes it.
+ */
+export function toast(message, kind = "info", { title, action, duration } = {}) {
   let host = document.getElementById("toasts");
   if (!host) {
-    host = h("div", { id: "toasts", "aria-live": "polite" });
+    host = h("div", { id: "toasts", role: "region", "aria-label": "Notifications", "aria-live": "polite" });
     document.body.append(host);
   }
-  const node = h("div", { class: `toast toast-${kind}` }, icon(kind === "error" ? "alert" : kind === "success" ? "check" : "info", 16), h("span", { text: message }));
+  while (host.children.length >= MAX_TOASTS) host.firstChild.remove();
+  const ms = duration ?? (kind === "error" ? 7000 : action || title ? 6000 : 3600);
+  let timer = null;
+  const close = () => {
+    clearTimeout(timer);
+    node.classList.add("leaving");
+    setTimeout(() => node.remove(), 300);
+  };
+  const start = () => { if (ms > 0) timer = setTimeout(close, ms); };
+  const node = h("div", { class: `toast toast-${kind}`, role: kind === "error" ? "alert" : "status" },
+    h("span", { class: "toast-icon" }, icon(TOAST_ICON[kind] || "info", 16)),
+    h("div", { class: "toast-body" },
+      title ? h("strong", { class: "toast-title", text: title }) : null,
+      h("span", { text: message }),
+      action ? h("button", { type: "button", class: "toast-action", onClick: () => { close(); action.onClick(); } }, action.label) : null),
+    h("button", { type: "button", class: "toast-close", "aria-label": "Dismiss", onClick: close }, icon("x", 14)));
+  node.addEventListener("mouseenter", () => clearTimeout(timer));
+  node.addEventListener("mouseleave", start);
   host.append(node);
-  setTimeout(() => node.classList.add("leaving"), 3200);
-  setTimeout(() => node.remove(), 3600);
+  start();
+  return close;
 }
 
 export function modal({ title, body, actions = [], onClose }) {
@@ -167,7 +197,7 @@ export function modal({ title, body, actions = [], onClose }) {
   const dialog = h("div", { class: "modal", role: "dialog", "aria-modal": "true", "aria-label": title },
     h("div", { class: "modal-head" }, h("h2", { text: title }), iconButton("x", "Close", close)),
     h("div", { class: "modal-body" }, body),
-    footer);
+    actions.length ? footer : null);
   backdrop.append(dialog);
   backdrop.addEventListener("mousedown", (event) => { if (event.target === backdrop) close(); });
   document.addEventListener("keydown", onKey);

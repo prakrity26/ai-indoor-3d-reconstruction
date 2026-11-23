@@ -2,6 +2,8 @@
 
 import { h, icon, toast, fill } from "./ui.js";
 import { applyTheme } from "./prefs.js";
+import { bellButton, startNotifications } from "./notify.js";
+import { showWelcome } from "./guide.js";
 import * as dashboard from "./pages/dashboard.js";
 import * as projects from "./pages/projects.js";
 import * as create from "./pages/create.js";
@@ -116,13 +118,17 @@ async function route({ force = false } = {}) {
   } catch (error) {
     if (token !== renderToken) return;
     fill(main, h("div", { class: "empty" }, icon("alert", 28), h("h3", { text: error.status === 404 ? "Not found" : "Something went wrong" }), h("p", { class: "muted", text: error.message }), h("a", { href: "#/", class: "link", text: "Back to the dashboard" })));
-    if (error.status !== 404) toast(error.message, "error");
+    if (error.status === 0) toast("The server is not reachable. Start it with: python -m api", "error", { title: "Can't load this page" });
+    else if (error.status !== 404) toast(error.message, "error", { title: "Something went wrong" });
   }
   main.focus({ preventScroll: true });
 }
 
 applyTheme();
+document.getElementById("brand-row").append(bellButton());
+document.getElementById("topbar-bell").append(bellButton());
+startNotifications({ navigate: (hash) => ctx.navigate(hash) });
 document.getElementById("nav-toggle").addEventListener("click", () => document.body.classList.toggle("nav-open"));
 document.getElementById("scrim").addEventListener("click", () => document.body.classList.remove("nav-open"));
 window.addEventListener("hashchange", () => route());
-route({ force: true });
+route({ force: true }).then(() => showWelcome(ctx));

@@ -360,14 +360,26 @@ input[type="range"] { flex: 1; accent-color: var(--accent); }
 .empty-icon { display: grid; place-items: center; width: 60px; height: 60px; border-radius: 16px; background: var(--accent-weak); color: var(--accent); margin-bottom: 8px; }
 .spinner { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--surface-3); border-top-color: var(--accent); animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-#toasts { position: fixed; right: 20px; bottom: 20px; z-index: 90; display: flex; flex-direction: column; gap: 8px; }
+#toasts { position: fixed; right: 20px; bottom: 20px; z-index: 90; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
 .toast {
-  display: flex; align-items: center; gap: 9px; padding: 11px 14px; border-radius: 10px; min-width: 240px; max-width: 380px;
-  background: var(--text); color: var(--surface); box-shadow: var(--shadow-lg); font-size: 0.9rem;
-  animation: toast-in 0.18s ease; transition: opacity 0.3s, transform 0.3s;
+  display: flex; align-items: flex-start; gap: 10px; padding: 12px 10px 12px 14px; border-radius: 12px; width: min(380px, calc(100vw - 32px));
+  background: var(--surface); color: var(--text); border: 1px solid var(--border); border-left: 4px solid var(--info);
+  box-shadow: var(--shadow-lg); font-size: 0.88rem; line-height: 1.4;
+  animation: toast-in 0.2s ease; transition: opacity 0.3s, transform 0.3s;
 }
-.toast-error { background: var(--err-strong); color: #fff; }
+.toast-icon { display: grid; place-items: center; width: 26px; height: 26px; flex: none; border-radius: 8px; background: var(--info-weak); color: var(--info); }
+.toast-body { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.toast-title { font-weight: 650; }
+.toast-action { align-self: flex-start; margin-top: 6px; padding: 4px 10px; border-radius: 7px; border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text); font: inherit; font-weight: 600; font-size: 0.82rem; cursor: pointer; }
+.toast-action:hover { border-color: var(--accent); color: var(--accent); }
+.toast-close { display: grid; place-items: center; width: 24px; height: 24px; flex: none; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; }
+.toast-close:hover { background: var(--surface-2); color: var(--text); }
+.toast-success { border-left-color: var(--ok); } .toast-success .toast-icon { background: var(--ok-weak); color: var(--ok); }
+.toast-warning { border-left-color: var(--warn); } .toast-warning .toast-icon { background: var(--warn-weak); color: var(--warn); }
+.toast-error { border-left-color: var(--err-strong); } .toast-error .toast-icon { background: var(--err-weak); color: var(--err-strong); }
+.toast-progress { border-left-color: var(--accent); } .toast-progress .toast-icon { background: var(--accent-weak); color: var(--accent); }
 .toast.leaving { opacity: 0; transform: translateY(6px); }
+@media (max-width: 600px) { #toasts { left: 16px; right: 16px; bottom: 16px; align-items: stretch; } .toast { width: auto; } }
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
 .modal-backdrop { position: fixed; inset: 0; z-index: 80; background: rgba(8, 10, 16, 0.5); display: grid; place-items: center; padding: 16px; animation: fade 0.15s ease; }
 .modal { width: min(540px, 100%); max-height: calc(100vh - 32px); overflow: auto; background: var(--surface); border-radius: 16px; box-shadow: var(--shadow-lg); border: 1px solid var(--border); }
@@ -503,3 +515,84 @@ body.embed .share-bar { display: none; }
 .splat-failed { color: var(--err-strong); }
 .pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.84rem; }
 .share-page .chip.on { background: #eef0f6; color: #0c0e14; border-color: #eef0f6; }
+
+/* ---- ghost button ---------------------------------------------------------------------------- */
+.btn-ghost { background: transparent; border-color: transparent; color: var(--muted); }
+.btn-ghost:hover:not(:disabled) { color: var(--text); }
+
+/* ---- notification bell & panel ----------------------------------------------------------------- */
+.brand-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding-bottom: 14px; }
+.brand-row .brand { padding-bottom: 4px; }
+.bell { position: relative; }
+.bell-count {
+  position: absolute; top: 2px; right: 1px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px;
+  background: var(--err-strong); color: #fff; font-size: 0.68rem; font-weight: 700; line-height: 17px; text-align: center;
+  border: 2px solid var(--surface);
+}
+#topbar-bell { margin-left: auto; display: flex; }
+.notif-panel {
+  position: fixed; z-index: 85; max-height: min(520px, calc(100vh - 80px)); display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow-lg); animation: fade 0.12s ease;
+}
+.notif-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.notif-head .link-btn { font-size: 0.84rem; color: var(--muted); }
+.notif-list { list-style: none; margin: 0; padding: 6px; overflow-y: auto; }
+.notif-item { display: flex; gap: 10px; width: 100%; padding: 10px; border: 0; border-radius: 10px; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.notif-item:hover:not(:disabled) { background: var(--surface-2); }
+.notif-item:disabled { cursor: default; }
+.notif.unread .notif-item { background: var(--accent-weak); }
+.notif-icon { display: grid; place-items: center; width: 26px; height: 26px; flex: none; border-radius: 8px; background: var(--info-weak); color: var(--info); }
+.notif-success .notif-icon { background: var(--ok-weak); color: var(--ok); }
+.notif-warning .notif-icon { background: var(--warn-weak); color: var(--warn); }
+.notif-error .notif-icon { background: var(--err-weak); color: var(--err-strong); }
+.notif-progress .notif-icon { background: var(--accent-weak); color: var(--accent); }
+.notif-text { display: flex; flex-direction: column; gap: 2px; font-size: 0.86rem; line-height: 1.4; min-width: 0; overflow-wrap: anywhere; }
+.notif-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 32px 24px; text-align: center; color: var(--muted); }
+
+/* ---- offline banner ----------------------------------------------------------------------------- */
+.offline-banner {
+  position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 95; display: flex; align-items: center; gap: 10px;
+  max-width: calc(100vw - 32px); padding: 10px 16px; border-radius: 10px; background: var(--warn-weak); color: var(--warn);
+  border: 1px solid var(--warn); box-shadow: var(--shadow-lg); font-size: 0.88rem; font-weight: 560;
+}
+
+/* ---- welcome tour ------------------------------------------------------------------------------- */
+.tour { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 8px 4px 4px; }
+.tour h3 { margin: 4px 0 0; font-size: 1.2rem; }
+.tour p { max-width: 30rem; margin: 0; line-height: 1.55; }
+.tour-icon { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 18px; background: var(--accent-weak); color: var(--accent); }
+.tour-dots { display: flex; gap: 6px; margin: 8px 0 4px; }
+.tour-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--border-strong); transition: width 0.2s; }
+.tour-dot.on { width: 22px; background: var(--accent); }
+.tour-actions { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; flex-wrap: wrap; margin-top: 6px; }
+.tour-final { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+/* ---- getting-started checklist ------------------------------------------------------------------- */
+.checklist { margin-bottom: 20px; }
+.checklist .panel-head h2 { margin-bottom: 2px; }
+.checklist-bar { margin: 4px 0 14px; }
+.checklist-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.checklist-steps li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 10px; border-radius: 10px; }
+.checklist-steps li.next { background: var(--accent-weak); }
+.checklist-steps li > div { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.checklist-steps li.done strong { color: var(--muted); text-decoration: line-through; font-weight: 520; }
+.check-mark {
+  display: grid; place-items: center; width: 26px; height: 26px; border-radius: 999px; font-size: 0.8rem; font-weight: 700;
+  border: 2px solid var(--border-strong); color: var(--muted);
+}
+.checklist-steps li.next .check-mark { border-color: var(--accent); color: var(--accent); }
+.checklist-steps li.done .check-mark { background: var(--ok); border-color: var(--ok); color: #fff; }
+@media (max-width: 560px) { .checklist-steps li { grid-template-columns: auto 1fr; } .checklist-steps li .btn { grid-column: 2; justify-self: start; } }
+
+/* ---- page tips ----------------------------------------------------------------------------------- */
+.page-tip {
+  display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px; margin-bottom: 20px; border-radius: 12px;
+  background: var(--accent-weak); border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); font-size: 0.9rem; line-height: 1.5;
+}
+.page-tip > div { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.page-tip-icon { color: var(--accent); margin-top: 1px; }
+.page-tip .link-btn { color: var(--accent); font-weight: 600; white-space: nowrap; font-size: 0.86rem; }
+
+/* ---- next-step hint inside panels ---------------------------------------------------------------- */
+.next-step { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 10px; background: var(--surface-2); font-size: 0.88rem; line-height: 1.5; margin-top: 10px; }
+.next-step .icon { color: var(--accent); flex: none; margin-top: 2px; }

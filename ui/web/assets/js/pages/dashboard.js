@@ -1,6 +1,7 @@
 import { api } from "../api.js";
 import { h, button, icon, emptyState, statusBadge, progressBar, timeAgo } from "../ui.js";
-import { projectCard, pageHeader, captureTips, splatLine } from "./common.js";
+import { projectCard, pageHeader, captureTips, splatLine, pageTip } from "./common.js";
+import { checklist } from "../guide.js";
 
 export async function render(main, _params, ctx) {
   const projects = await api.list();
@@ -12,11 +13,17 @@ export async function render(main, _params, ctx) {
   const stat = (label, value, iconName, href) =>
     h("a", { class: "stat", href }, h("div", { class: "stat-icon" }, icon(iconName)), h("div", {}, h("div", { class: "stat-value", text: String(value) }), h("div", { class: "muted small", text: label })));
 
+  const checklistSlot = h("div");
+  const list = checklist(projects, ctx, () => checklistSlot.replaceChildren());
+  if (list) checklistSlot.append(list);
+
   const recent = [...projects].sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || "")).slice(0, 6);
 
   main.append(
     pageHeader("Dashboard", "Capture a room on your phone, upload it, and explore it in 3D.",
       button("New project", { kind: "primary", iconName: "plus", onClick: () => ctx.navigate("#/new") })),
+    pageTip("dashboard"),
+    checklistSlot,
     h("div", { class: "stats" },
       stat("Projects", projects.length, "folder", "#/projects"),
       stat("Ready to explore", ready.length, "cube", "#/projects?status=succeeded"),

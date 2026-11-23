@@ -1,6 +1,7 @@
 import { api } from "../api.js";
 import { h, button, icon, field, toast, formatBytes, fill } from "../ui.js";
-import { pageHeader, captureTips } from "./common.js";
+import { pageHeader, captureTips, pageTip } from "./common.js";
+import { pokeWatcher } from "../notify.js";
 
 // Checks we can run in the browser before uploading. The worker runs deeper checks in Phase 1.
 function inspectVideo(file, config) {
@@ -74,6 +75,10 @@ export async function render(main, _params, ctx) {
         inspected.width ? h("div", { class: "fact" }, h("span", { class: "muted small", text: "Resolution" }), h("strong", { text: `${inspected.width} × ${inspected.height}` })) : null),
     ].filter(Boolean));
     const blocking = inspected.warnings.some(([level]) => level === "error");
+    const cautions = inspected.warnings.filter(([level]) => level === "warning").length;
+    if (blocking) toast("This video can't be uploaded. See the message below the preview.", "error", { title: "Video check failed" });
+    else if (cautions) toast(`${cautions} thing${cautions === 1 ? "" : "s"} to check below. You can still upload.`, "warning", { title: "Video checked" });
+    else toast("Looks good. Name the project and press Upload.", "success", { title: "Video checked" });
     fill(warningsBox, 
       inspected.warnings.length
         ? h("ul", { class: "warn-list" }, ...inspected.warnings.map(([level, text]) => h("li", { class: `warn warn-${level}` }, icon(level === "error" ? "alert" : "info", 16), h("span", { text }))))
@@ -88,8 +93,10 @@ export async function render(main, _params, ctx) {
   const form = h("form", { class: "panel form", onSubmit: async (event) => {
     event.preventDefault();
     if (!file || uploading) return;
-    if (!nameInput.value.trim()) { nameInput.focus(); toast("Give the project a name", "error"); return; }
+    if (!nameInput.value.trim()) { nameInput.focus(); toast("Give the project a name so you can find it later.", "warning"); return; }
     uploading = true;
+    window.addEventListener("beforeunload", holdTab);
+    toast("Keep this tab open until the upload finishes. After that you can leave; processing continues on the server.", "progress", { title: "Uploading" });
     submit.disabled = true;
     progress.hidden = false;
     const bar = h("div", { class: "progress-fill", style: { width: "0%" } });
@@ -102,11 +109,14 @@ export async function render(main, _params, ctx) {
         bar.style.width = `${pct}%`;
         label.textContent = pct >= 100 ? "Saving on the server…" : `Uploading… ${pct}%`;
       });
-      toast("Upload complete. Processing has been queued.", "success");
+      window.removeEventListener("beforeunload", holdTab);
+      toast("Your video is queued for processing. We'll notify you at each step, so feel free to keep browsing.", "success", { title: "Upload complete" });
+      pokeWatcher();
       ctx.navigate(`#/projects/${project.job_id}`);
     } catch (error) {
       const message = error.message || String(error);
-      toast(message, "error");
+      window.removeEventListener("beforeunload", holdTab);
+      toast(message, "error", { title: "Upload failed" });
       label.textContent = message;
       uploading = false;
       submit.disabled = false;
@@ -126,6 +136,7 @@ export async function render(main, _params, ctx) {
   paintDrop();
   main.append(
     pageHeader("Create project", "Upload a standard smartphone video of an indoor space. 360° video is not supported yet."),
+    pageTip("new"),
     h("div", { class: "create-grid" },
       form,
       h("aside", { class: "panel" },
@@ -133,5 +144,7 @@ export async function render(main, _params, ctx) {
         captureTips(),
         h("p", { class: "muted small", text: "Reconstruction runs in the background. You can leave this page; progress shows in Processing jobs." }))));
 
-  return () => { if (inspected?.url) URL.revokeObjectURL(inspected.url); };
+  // Hash navigation keeps the upload going, but closing or reloading the tab would cancel it.
+  function holdTab(event) { event.preventDefault(); event.returnValue = ""; }
+  return () => { if (!uploading) window.removeEventListener("beforeunload", holdTab); if (inspected?.url) URL.revokeObjectURL(inspected.url); };
 }

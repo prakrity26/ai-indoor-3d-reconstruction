@@ -1,6 +1,6 @@
 import { api } from "../api.js";
 import { h, button, emptyState, statusBadge, progressBar, timeAgo, toast, iconButton, fill } from "../ui.js";
-import { pageHeader, splatLine } from "./common.js";
+import { pageHeader, splatLine, pageTip } from "./common.js";
 
 export async function render(main, _params, ctx) {
   let jobs = (await api.list()).filter((p) => p.origin !== "sample");
@@ -20,7 +20,7 @@ export async function render(main, _params, ctx) {
       h("td", { class: "right" },
         job.status === "succeeded" ? button("Open", { size: "sm", iconName: "cube", onClick: () => ctx.navigate(`#/studio/${job.job_id}`) }) : null,
         job.status === "failed" ? button("Retry", { size: "sm", iconName: "refresh", onClick: async () => {
-          try { await api.retry(job.job_id); toast("Queued again", "success"); await reload(); } catch (error) { toast(error.message, "error"); }
+          try { await api.retry(job.job_id); toast(`"${job.name}" queued again. A worker will pick it up shortly.`, "success"); await reload(); } catch (error) { toast(error.message, "error"); }
         } }) : null,
         iconButton("info", "Details", () => ctx.navigate(`#/projects/${job.job_id}`))));
   }
@@ -48,7 +48,8 @@ export async function render(main, _params, ctx) {
   paint();
   main.append(
     pageHeader("Processing jobs", "Each upload runs through frame extraction, camera poses, depth, point cloud, filtering, mesh, labels, and evaluation.",
-      button("Refresh", { iconName: "refresh", onClick: reload })),
+      button("Refresh", { iconName: "refresh", onClick: async () => { await reload(); toast("Up to date", "success", { duration: 1500 }); } })),
+    pageTip("jobs"),
     body,
     h("p", { class: "muted small footnote", text: "Mesh jobs need: python -m queue.workers --pipeline mesh. Photoreal splats need a GPU worker: see notebooks/colab_gpu_worker.ipynb." }));
   const timer = setInterval(reload, 3000);

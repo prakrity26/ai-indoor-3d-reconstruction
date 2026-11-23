@@ -356,6 +356,7 @@ def create_app(store: JobStore | None = None, *, include_library: bool = False) 
             "splat_stage": record.get("splat_stage") or "",
             "splat_progress": int(record.get("splat_progress") or 0),
             "splat_error": record.get("splat_error") or "",
+            "splat_updated_at": record.get("splat_updated_at") or "",
             "can_train_splat": bool(record.get("source_path")) and Path(record.get("source_path") or "").is_file(),
             "mesh_url": f"/jobs/{job_id}/mesh.glb" if mesh is not None else "",
             "scene_url": f"/jobs/{job_id}/scene.json" if scene is not None else "",

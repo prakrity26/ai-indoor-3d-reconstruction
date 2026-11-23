@@ -26,3 +26,10 @@ def test_no_local_name_shadows_an_import() -> None:
                 line = source.count("\n", 0, match.start()) + 1
                 problems.append(f"{path.relative_to(JS)}:{line} redeclares imported '{match.group(1)}'")
     assert not problems, "\n".join(problems)
+
+
+def test_page_tip_never_returns_null() -> None:
+    """Pages append pageTip() directly; a dismissed tip returning null printed "null" on the dashboard."""
+    source = (JS / "guide.js").read_text(encoding="utf-8")
+    body = source.split("export function pageTip", 1)[1].split("\nexport function", 1)[0]
+    assert "return null" not in body

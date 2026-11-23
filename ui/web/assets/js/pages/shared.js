@@ -1,6 +1,6 @@
 import { api } from "../api.js";
 import { h, button, emptyState, timeAgo, toast, copyText, absoluteUrl, confirmDialog, fill } from "../ui.js";
-import { pageHeader, projectThumb } from "./common.js";
+import { pageHeader, projectThumb, pageTip } from "./common.js";
 
 export function embedCode(project) {
   return `<iframe src="${absoluteUrl(project.embed_url)}" width="800" height="500" style="border:0;border-radius:12px" allow="fullscreen" title="${project.name.replace(/"/g, "&quot;")}"></iframe>`;
@@ -41,6 +41,6 @@ export async function render(main, _params, ctx) {
   }
 
   paint();
-  main.append(pageHeader("Shared scenes", "Published 3D experiences. Anyone with a link can view them; nobody can edit them."), list);
+  main.append(pageHeader("Shared scenes", "Published 3D experiences. Anyone with a link can view them; nobody can edit them."), pageTip("shared"), list);
   return null;
 }

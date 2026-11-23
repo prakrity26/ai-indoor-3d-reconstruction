@@ -3,6 +3,7 @@ import { h, button, icon, iconButton, toast, modal, field, copyText, absoluteUrl
 import { createMeshViewer, createSplatViewer, viewerToolbar, toggleFullscreen, SPLAT_UP_ORDER } from "../viewer.js";
 import { prefs } from "../prefs.js";
 import { embedCode } from "./shared.js";
+import { studioGuide } from "../guide.js";
 
 const KINDS = [["info", "Information marker"], ["label", "Text label"], ["media", "Image / video"]];
 const COLORS = ["#6e8bff", "#22c55e", "#f59e0b", "#ef4444", "#a855f7", "#14b8a6", "#f8fafc"];
@@ -38,6 +39,7 @@ export async function render(main, params, ctx) {
   const title = h("strong", { class: "studio-title", text: project.name });
 
   stage.append(host, hint);
+  studioGuide(project.origin !== "sample");
   main.classList.add("main-studio");
   main.append(h("div", { class: "studio" },
     h("div", { class: "studio-bar" },

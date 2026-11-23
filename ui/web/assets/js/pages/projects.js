@@ -1,6 +1,6 @@
 import { api } from "../api.js";
 import { h, button, icon, iconButton, emptyState, statusBadge, timeAgo, modal, field, toast, confirmDialog, fill } from "../ui.js";
-import { projectCard, pageHeader, projectThumb } from "./common.js";
+import { projectCard, pageHeader, projectThumb, pageTip, nextStep } from "./common.js";
 
 const FILTERS = [["all", "All"], ["succeeded", "Ready"], ["running", "Processing"], ["queued", "Queued"], ["failed", "Failed"]];
 
@@ -67,6 +67,7 @@ export async function render(main, params, ctx) {
   paint();
   main.append(
     pageHeader("My projects", "All of your reconstructed indoor spaces.", button("New project", { kind: "primary", iconName: "plus", onClick: () => ctx.navigate("#/new") })),
+    pageTip("projects"),
     h("div", { class: "toolbar" }, searchInput, chips, layoutToggle),
     results);
 
@@ -129,6 +130,7 @@ export async function deleteProject(project, ctx) {
 
 export async function renderDetail(main, params, ctx) {
   let project = await api.get(params.id);
+  const tip = pageTip("detail");
 
   function fact(label, value) {
     return value == null || value === "" ? null : h("div", { class: "fact" }, h("span", { class: "muted small", text: label }), h("strong", { text: String(value) }));
@@ -137,7 +139,7 @@ export async function renderDetail(main, params, ctx) {
   async function trainSplat() {
     try {
       project = await api.requestSplat(project.job_id);
-      toast("Queued for a GPU worker", "success");
+      toast("Queued for a GPU worker. We'll notify you when training starts and when it's ready.", "success", { title: "Splat requested" });
       paint();
     } catch (error) { toast(error.message, "error"); }
   }
@@ -192,8 +194,9 @@ export async function renderDetail(main, params, ctx) {
         project.status === "succeeded" ? button("Open in 3D Studio", { kind: "primary", iconName: "cube", onClick: () => ctx.navigate(`#/studio/${project.job_id}`) }) : null,
         button("Edit", { iconName: "edit", onClick: () => renameDialog(project, (updated) => { project = { ...project, ...updated }; paint(); }) }),
         project.status === "failed" ? button("Retry", { iconName: "refresh", onClick: async () => {
-          try { project = await api.retry(project.job_id); toast("Queued again", "success"); paint(); } catch (error) { toast(error.message, "error"); }
+          try { project = await api.retry(project.job_id); toast("Queued again. A worker will pick it up shortly.", "success"); paint(); } catch (error) { toast(error.message, "error"); }
         } }) : null),
+      tip,
       h("div", { class: "detail-grid" },
         h("div", { class: "detail-main" },
           h("section", { class: "panel" },
@@ -204,6 +207,12 @@ export async function renderDetail(main, params, ctx) {
                   project.status === "queued" ? h("p", { class: "muted small", text: "Start a worker with: python -m queue.workers --pipeline mesh" }) : null)
               : null,
             project.status === "failed" ? h("div", { class: "callout callout-error" }, icon("alert"), h("div", {}, h("strong", { text: "Processing failed" }), h("p", { text: project.error || "Unknown error." }))) : null,
+            project.origin !== "sample" ? nextStep({
+              queued: "Next: a worker picks this up, usually within seconds. You don't need to stay here: you'll get a notification when it starts and when it's ready.",
+              running: `Step ${stepNumber(project.progress)} of 9 is running. Most videos take a few minutes. Feel free to leave this page; the bell will tell you when it's done.`,
+              succeeded: "Next: open it in the 3D Studio to look around, add hotspots, save viewpoints, and share it.",
+              failed: "Press Retry to run it again. If it fails twice, record a new video: move slowly, light the room well, and overlap your path.",
+            }[project.status] || "") : null,
             h("div", { class: "facts" },
               fact("Posed / selected frames", s.selected_frames ? `${s.posed_frames ?? "—"} / ${s.selected_frames}` : null),
               fact("Filtered points", s.filtered_points?.toLocaleString()),
@@ -260,6 +269,10 @@ export async function renderDetail(main, params, ctx) {
     }
   }, 3000);
   return () => clearInterval(timer);
+}
+
+function stepNumber(progress) {
+  return Math.min(9, Math.round(((progress || 0) / 100) * 9) + 1); // worker reports index*100/9 before each stage
 }
 
 function formatSize(bytes) {

@@ -1,6 +1,12 @@
 // Building blocks shared by several pages.
 
 import { h, icon, statusBadge, progressBar, timeAgo } from "../ui.js";
+export { pageTip } from "../guide.js";
+
+/** "What happens next" line so the user always knows whether to wait, act, or leave. */
+export function nextStep(text) {
+  return h("div", { class: "next-step" }, icon("compass", 16), h("span", { text }));
+}
 
 export function projectThumb(project) {
   const box = h("div", { class: "thumb" });
