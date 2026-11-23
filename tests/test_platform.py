@@ -193,7 +193,7 @@ def test_old_database_gains_project_columns(tmp_path: Path) -> None:
             )
         )
         connection.execute(text("INSERT INTO jobs VALUES ('old', 'succeeded', 'old.mp4', '', '', '', '2026-10-01T00:00:00+00:00')"))
-    assert migrate(engine) == ["001_jobs", "002_projects"]
+    assert migrate(engine) == ["001_jobs", "002_projects", "003_splat"]
     assert migrate(engine) == []
     store = JobStore(tmp_path)
     old = store.get("old")
@@ -230,3 +230,12 @@ def test_security_headers(env) -> None:
     assert page.headers["x-frame-options"] == "SAMEORIGIN"
     assert client.get("/assets/app.css").headers["cache-control"] == "no-cache"
     assert "x-frame-options" not in client.get("/embed/anything").headers
+
+
+def test_studio_keeps_a_valid_splat_up_axis(env) -> None:
+    _, client, _ = env
+    assert client.get("/jobs/img7916/studio.json").json()["settings"]["splat_up"] == "auto"
+    saved = client.put("/jobs/img7916/studio.json", json={"settings": {"splat_up": "+z"}}).json()
+    assert saved["settings"]["splat_up"] == "+z"
+    bad = client.put("/jobs/img7916/studio.json", json={"settings": {"splat_up": "sideways"}}).json()
+    assert bad["settings"]["splat_up"] == "auto"

@@ -38,6 +38,7 @@ export const api = {
   update: (id, fields) => request("PATCH", `/jobs/${encodeURIComponent(id)}`, fields),
   remove: (id) => request("DELETE", `/jobs/${encodeURIComponent(id)}`),
   retry: (id) => request("POST", `/jobs/${encodeURIComponent(id)}/retry`),
+  requestSplat: (id) => request("POST", `/jobs/${encodeURIComponent(id)}/splat`),
   setVisibility: (id, visibility) => request("PUT", `/jobs/${encodeURIComponent(id)}/visibility`, { visibility }),
   rotateShare: (id) => request("POST", `/jobs/${encodeURIComponent(id)}/share/rotate`),
   studio: (id) => request("GET", `/jobs/${encodeURIComponent(id)}/studio.json`),
@@ -45,12 +46,13 @@ export const api = {
   shared: (token) => request("GET", `/shared/${encodeURIComponent(token)}`),
 
   /** Upload with progress. onProgress(fraction 0..1). Resolves to the created project. */
-  upload(file, { name, description }, onProgress) {
+  upload(file, { name, description, splat }, onProgress) {
     return new Promise((resolve, reject) => {
       const form = new FormData();
       form.append("file", file, file.name);
       form.append("name", name || "");
       form.append("description", description || "");
+      form.append("splat", splat ? "true" : "false");
       const xhr = new XMLHttpRequest();
       xhr.open("POST", "/jobs");
       xhr.upload.onprogress = (event) => {

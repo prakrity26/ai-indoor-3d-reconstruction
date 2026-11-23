@@ -1,6 +1,6 @@
 import { api } from "../api.js";
 import { h, button, icon, iconButton, toast, modal, field, copyText, absoluteUrl, confirmDialog, statusBadge, emptyState, fill } from "../ui.js";
-import { createMeshViewer, createSplatViewer, viewerToolbar, toggleFullscreen } from "../viewer.js";
+import { createMeshViewer, createSplatViewer, viewerToolbar, toggleFullscreen, SPLAT_UP_ORDER } from "../viewer.js";
 import { prefs } from "../prefs.js";
 import { embedCode } from "./shared.js";
 
@@ -54,8 +54,19 @@ export async function render(main, params, ctx) {
     if (viewer) viewer.destroy();
     host.querySelectorAll(".viewer-tools").forEach((n) => n.remove());
     if (mode === "walk") {
-      viewer = createSplatViewer(host, project.splat_url);
-      host.append(viewerToolbar({ onReset: () => viewer.reset(), onFullscreen: () => toggleFullscreen(stage) }));
+      viewer = createSplatViewer(host, project.splat_url, doc.settings.splat_up || "auto");
+      host.append(viewerToolbar({
+        onReset: () => viewer.reset(),
+        onFullscreen: () => toggleFullscreen(stage),
+        onFlipUp: () => {
+          const current = doc.settings.splat_up || "auto";
+          const next = SPLAT_UP_ORDER[(SPLAT_UP_ORDER.indexOf(current) + 1) % SPLAT_UP_ORDER.length];
+          doc.settings.splat_up = next;
+          const used = viewer.setUp(next);
+          toast(`Up direction: ${next === "auto" ? `automatic (${used || "?"})` : next}. Save to keep it.`);
+          paintBar();
+        },
+      }));
     } else {
       viewer = createMeshViewer(host, {
         src: project.mesh_url,
@@ -79,7 +90,7 @@ export async function render(main, params, ctx) {
 
   function paintHint() {
     let text = "";
-    if (mode === "walk") text = "Click the scene, then move with W A S D. Esc releases the mouse. Hotspots are edited in Orbit mode.";
+    if (mode === "walk") text = ""; // the embedded splat viewer shows its own instructions
     else if (editing) text = "Edit mode: click the model to place a hotspot. Drag to orbit, right-drag to pan.";
     else if (prefs().editHints !== "off") text = "Drag to orbit · scroll to zoom · right-drag or two fingers to pan · distances are relative";
     hint.textContent = text;
@@ -90,7 +101,10 @@ export async function render(main, params, ctx) {
   function paintBar() {
     fill(modeSwitch, 
       h("button", { type: "button", class: mode === "orbit" ? "on" : "", disabled: !project.mesh_url, title: project.mesh_url ? "Orbit the mesh" : "No mesh for this scene", onClick: () => setMode("orbit") }, icon("orbit", 16), "Orbit"),
-      h("button", { type: "button", class: mode === "walk" ? "on" : "", disabled: !project.splat_url, title: project.splat_url ? "Walk the Gaussian splat" : "A walkable splat needs the GPU worker", onClick: () => setMode("walk") }, icon("walk", 16), "Walk"));
+      h("button", { type: "button", class: mode === "walk" ? "on" : "", disabled: !project.splat_url, title: project.splat_url ? "Walk the photoreal splat"
+        : project.splat_status === "running" ? `Splat training: ${project.splat_progress}%`
+        : project.splat_status === "queued" ? "Splat is waiting for a GPU worker"
+        : "Train a photoreal splat from the project page", onClick: () => setMode("walk") }, icon("walk", 16), "Walk"));
     saveBtn.disabled = !dirty() || saving;
     saveBtn.querySelector("span").textContent = saving ? "Saving…" : dirty() ? "Save" : "Saved";
     editBtn.classList.toggle("btn-active", editing);

@@ -83,6 +83,30 @@ services:
       - model_cache:/app/.cache/huggingface
     networks: [reconstruction]
 
+  # Remote GPU workers (Colab, rented GPUs) reach this, never the api. Start it with
+  #   WORKER_TOKEN=... docker compose --profile gpu up -d worker-gateway
+  # and tunnel port 8001 (cloudflared tunnel --url http://localhost:8001).
+  worker-gateway:
+    profiles: [gpu]
+    image: indoor3d-api:latest
+    build:
+      context: .
+      target: api
+    container_name: reconstruction-worker-gateway
+    restart: unless-stopped
+    command: ["python", "-m", "api.worker_gateway"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      <<: *app-env
+      WORKER_TOKEN: ${WORKER_TOKEN:-}  # the gateway refuses to start without a strong token
+      WORKER_GATEWAY_PORT: 8001
+    ports:
+      - "${WORKER_GATEWAY_PORT:-8001}:8001"
+    volumes:
+      - ./data:/app/data
+    networks: [reconstruction]
+
 volumes:
   postgres_data:
   model_cache:

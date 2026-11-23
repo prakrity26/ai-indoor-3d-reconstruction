@@ -15,6 +15,7 @@ from typing import Any
 MAX_HOTSPOTS = 200
 MAX_VIEWPOINTS = 50
 HOTSPOT_KINDS = ("info", "label", "media")
+SPLAT_UP = ("auto", "-y", "+z", "+y", "-z", "+x", "-x")
 
 _VEC3 = re.compile(r"^\s*-?\d+(\.\d+)?(e-?\d+)?m?(\s+-?\d+(\.\d+)?(e-?\d+)?m?){2}\s*$", re.I)
 _ORBIT = re.compile(r"^\s*-?\d+(\.\d+)?(deg|rad)\s+-?\d+(\.\d+)?(deg|rad)\s+\d+(\.\d+)?(e-?\d+)?(m|%)?\s*$", re.I)
@@ -38,6 +39,7 @@ def empty_document() -> dict[str, Any]:
             "shadow": 0.6,
             "auto_rotate": False,
             "default_viewpoint": "",
+            "splat_up": "auto",
         },
     }
 
@@ -149,6 +151,7 @@ def _settings(raw: Any, viewpoint_ids: set[str]) -> dict[str, Any]:
         "shadow": _clamp(raw.get("shadow"), 0.0, 1.0, base["shadow"]),
         "auto_rotate": bool(raw.get("auto_rotate")),
         "default_viewpoint": default_view if default_view in viewpoint_ids else "",
+        "splat_up": str(raw.get("splat_up")) if raw.get("splat_up") in SPLAT_UP else "auto",
     }
 
 

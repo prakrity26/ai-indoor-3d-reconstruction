@@ -11,6 +11,7 @@ worker wrote.
 | `app.py` | Routes, page serving, response headers |
 | `artifacts.py` | Finds mesh, splat, labels, evaluation, thumbnail, and input report files for a job |
 | `studio.py` | Validates and stores the 3D Studio document (hotspots, viewpoints, settings) |
+| `worker_gateway.py` | Separate app for remote GPU workers: claim, source download, progress, PLY upload, fail. Bearer `WORKER_TOKEN` (24+ chars) required; no platform routes |
 
 See the REST table in the root [README](../README.md#rest-api) or http://127.0.0.1:8000/docs.
 

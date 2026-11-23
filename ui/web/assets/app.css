@@ -493,3 +493,13 @@ div.item-head { cursor: default; }
 .share-credit { position: fixed; left: 14px; bottom: 12px; z-index: 6; font-size: 0.76rem; color: #c8cfdf; background: rgba(14, 16, 22, 0.72); padding: 4px 10px; border-radius: 999px; }
 .share-page .empty { color: #eef0f6; }
 body.embed .share-bar { display: none; }
+
+/* ---- photoreal splat ------------------------------------------------------------------------ */
+.option-card { padding: 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); }
+.option-card p { margin: 6px 0 0 25px; }
+.splat-line { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+.splat-running, .splat-queued { color: var(--info); }
+.splat-succeeded { color: var(--ok); }
+.splat-failed { color: var(--err-strong); }
+.pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.84rem; }
+.share-page .chip.on { background: #eef0f6; color: #0c0e14; border-color: #eef0f6; }

@@ -134,6 +134,53 @@ export async function renderDetail(main, params, ctx) {
     return value == null || value === "" ? null : h("div", { class: "fact" }, h("span", { class: "muted small", text: label }), h("strong", { text: String(value) }));
   }
 
+  async function trainSplat() {
+    try {
+      project = await api.requestSplat(project.job_id);
+      toast("Queued for a GPU worker", "success");
+      paint();
+    } catch (error) { toast(error.message, "error"); }
+  }
+
+  function splatPanel() {
+    const st = project.splat_status || "none";
+    const badge = { none: null, queued: statusBadge("queued"), running: statusBadge("running"), succeeded: statusBadge("succeeded"), failed: statusBadge("failed") }[st];
+    let body;
+    if (st === "none") {
+      body = [
+        h("p", { class: "muted", text: "A Gaussian splat is the photo-realistic, walkable version of this room. Training needs a GPU worker (Colab or a cloud GPU) and takes about 30–90 minutes." }),
+        project.can_train_splat
+          ? button("Train photoreal splat", { kind: "primary", iconName: "walk", onClick: trainSplat })
+          : h("p", { class: "muted small", text: "This project has no stored video, so a splat cannot be trained from it." }),
+      ];
+    } else if (st === "queued") {
+      body = [
+        h("p", { text: "Waiting for a GPU worker to pick this up." }),
+        h("p", { class: "muted small", text: "Start one with notebooks/colab_gpu_worker.ipynb (see the README section “Photoreal splats on a GPU”)." }),
+      ];
+    } else if (st === "running") {
+      body = [
+        h("div", { class: "stage-box" },
+          h("div", { class: "progress-row" }, h("strong", { text: project.splat_stage || "Training" }), h("span", { class: "muted", text: `${project.splat_progress}%` })),
+          h("div", { class: "progress progress-running" }, h("div", { class: "progress-fill", style: { width: `${project.splat_progress}%` } }))),
+        h("p", { class: "muted small", text: "Training runs on the GPU worker. You can close this page." }),
+      ];
+    } else if (st === "succeeded") {
+      body = [
+        h("p", { text: "The photoreal splat is ready. Open the 3D Studio and switch to Walk." }),
+        h("div", { class: "row" },
+          button("Walk the room", { kind: "primary", iconName: "walk", onClick: () => ctx.navigate(`#/studio/${project.job_id}`) }),
+          project.can_train_splat ? button("Train again", { iconName: "refresh", onClick: trainSplat }) : null),
+      ];
+    } else {
+      body = [
+        h("div", { class: "callout callout-error" }, icon("alert"), h("div", {}, h("strong", { text: "Splat training failed" }), h("p", { class: "pre", text: project.splat_error || "Unknown error." }))),
+        project.can_train_splat ? button("Train again", { iconName: "refresh", onClick: trainSplat }) : null,
+      ];
+    }
+    return h("section", { class: "panel" }, h("div", { class: "panel-head" }, h("h2", { text: "Photoreal splat" }), badge), ...body);
+  }
+
   function paint() {
     const s = project.summary || {};
     const input = project.input || {};
@@ -165,6 +212,7 @@ export async function renderDetail(main, params, ctx) {
               fact("Detected objects", s.scene_objects),
               fact("Walkable splat", project.splat_url ? "Yes" : "Not yet"),
               fact("Scale", "Relative (not metres)"))),
+          splatPanel(),
           warnings.length
             ? h("section", { class: "panel" }, h("div", { class: "panel-head" }, h("h2", { text: "Input quality" })),
                 h("ul", { class: "warn-list" }, ...warnings.map((w) => h("li", { class: `warn warn-${w.severity}` }, icon(w.severity === "error" ? "alert" : "info", 16), h("span", { text: w.message || w.code })))))
@@ -202,9 +250,11 @@ export async function renderDetail(main, params, ctx) {
 
   paint();
   const timer = setInterval(async () => {
-    if (project.status !== "queued" && project.status !== "running") return;
+    const busy = (st) => st === "queued" || st === "running";
+    if (!busy(project.status) && !busy(project.splat_status)) return;
     const latest = await api.get(project.job_id).catch(() => null);
-    if (latest && (latest.status !== project.status || latest.progress !== project.progress || latest.stage !== project.stage)) {
+    if (latest && (latest.status !== project.status || latest.progress !== project.progress || latest.stage !== project.stage
+      || latest.splat_status !== project.splat_status || latest.splat_progress !== project.splat_progress || latest.splat_stage !== project.splat_stage)) {
       project = latest;
       paint();
     }

@@ -190,18 +190,25 @@ export function createMeshViewer(host, options = {}) {
 }
 
 /** Walk mode: the Gaussian splat viewer page in an iframe (first-person, W A S D). */
-export function createSplatViewer(host, plyUrl) {
-  const frame = h("iframe", { class: "splat-frame", title: "Walkable Gaussian splat", src: `/viewer?embed=1&ply=${encodeURIComponent(plyUrl)}`, allow: "fullscreen" });
+export const SPLAT_UP_ORDER = ["auto", "-y", "+z", "+y", "-z", "+x", "-x"];
+
+export function createSplatViewer(host, plyUrl, up = "auto") {
+  const frame = h("iframe", { class: "splat-frame", title: "Walkable Gaussian splat", src: `/viewer?embed=1&up=${encodeURIComponent(up)}&ply=${encodeURIComponent(plyUrl)}`, allow: "fullscreen" });
   host.append(frame);
   return {
     element: frame,
     reset() { frame.src = frame.src; },
+    /** Re-frame the camera with a different up axis; returns the axis actually used. */
+    setUp(spec) {
+      const fn = frame.contentWindow && frame.contentWindow.setSplatUp;
+      return typeof fn === "function" ? fn(spec) : null;
+    },
     destroy() { frame.remove(); },
   };
 }
 
 /** Floating controls shared by the studio and share page. */
-export function viewerToolbar({ onReset, onZoomIn, onZoomOut, onFullscreen, onAutoRotate, autoRotate = false }) {
+export function viewerToolbar({ onReset, onZoomIn, onZoomOut, onFullscreen, onAutoRotate, onFlipUp, autoRotate = false }) {
   const rotate = h("button", { type: "button", class: `tool${autoRotate ? " on" : ""}`, title: "Auto-rotate", "aria-label": "Auto-rotate", "aria-pressed": String(autoRotate),
     onClick: () => {
       const on = !rotate.classList.contains("on");
@@ -215,6 +222,7 @@ export function viewerToolbar({ onReset, onZoomIn, onZoomOut, onFullscreen, onAu
     tool("zoomOut", "Zoom out", onZoomOut),
     tool("reset", "Reset camera", onReset),
     onAutoRotate ? rotate : null,
+    tool("flip", "Flip up direction (if the room looks sideways or upside down)", onFlipUp),
     tool("expand", "Fullscreen", onFullscreen));
 }
 

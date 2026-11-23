@@ -33,8 +33,19 @@
       document.title = `${project.name} · Indoor Spaces`;
       document.getElementById("title").textContent = project.name;
       document.getElementById("desc").textContent = project.description || "";
-      if (project.mesh_url) {
+      const views = document.getElementById("views");
+      let current = null;
+      function show(mode) {
+        if (current) current.destroy();
+        host.querySelectorAll(".viewer-tools").forEach((n) => n.remove());
+        if (mode === "walk") {
+          current = createSplatViewer(host, project.splat_url, studio.settings.splat_up || "auto");
+          host.append(viewerToolbar({ onFullscreen: () => toggleFullscreen(stage) }));
+          views.replaceChildren(...switcher(mode));
+          return;
+        }
         const viewer = createMeshViewer(host, { src: project.mesh_url });
+        current = viewer;
         viewer.setDoc(studio);
         host.append(viewerToolbar({
           onReset: () => viewer.reset(),
@@ -44,12 +55,18 @@
           autoRotate: studio.settings.auto_rotate,
           onFullscreen: () => toggleFullscreen(stage),
         }));
-        document.getElementById("views").replaceChildren(...studio.viewpoints.map((view) =>
+        views.replaceChildren(...switcher(mode), ...studio.viewpoints.map((view) =>
           h("button", { type: "button", class: "chip", onClick: () => viewer.goTo(view), text: view.name })));
-      } else if (project.splat_url) {
-        createSplatViewer(host, project.splat_url);
-        host.append(viewerToolbar({ onFullscreen: () => toggleFullscreen(stage) }));
       }
+      function switcher(mode) {
+        if (!(project.mesh_url && project.splat_url)) return [];
+        return [
+          h("button", { type: "button", class: `chip${mode === "orbit" ? " on" : ""}`, onClick: () => show("orbit"), text: "Orbit" }),
+          h("button", { type: "button", class: `chip${mode === "walk" ? " on" : ""}`, onClick: () => show("walk"), text: "Walk (photoreal)" }),
+        ];
+      }
+      if (project.splat_url && (!project.mesh_url || !studio.hotspots.length)) show("walk");
+      else if (project.mesh_url) show("orbit");
     } catch (error) {
       document.getElementById("title").textContent = "Scene unavailable";
       host.replaceChildren(h("div", { class: "empty" }, h("h3", { text: "This scene is not available" }), h("p", { class: "muted", text: error.message })));

@@ -30,3 +30,10 @@ class JobRow(Base):
     mesh_path: Mapped[str] = mapped_column(String, nullable=False, default="")
     origin: Mapped[str] = mapped_column(String, nullable=False, default="upload")
     updated_at: Mapped[str] = mapped_column(String, nullable=False, default="")
+    # 003_splat
+    splat_status: Mapped[str] = mapped_column(String, nullable=False, default="none")
+    splat_stage: Mapped[str] = mapped_column(String, nullable=False, default="")
+    splat_progress: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    splat_error: Mapped[str] = mapped_column(String, nullable=False, default="")
+    splat_worker: Mapped[str] = mapped_column(String, nullable=False, default="")
+    splat_updated_at: Mapped[str] = mapped_column(String, nullable=False, default="")

@@ -41,6 +41,8 @@ class JobRepository:
             mesh_path=record.get("mesh_path") or "",
             origin=record.get("origin") or "upload",
             updated_at=now,
+            splat_status=record.get("splat_status") or "none",
+            splat_updated_at=now if record.get("splat_status") == "queued" else "",
         )
         with Session(self.engine) as session:
             session.add(row)
@@ -151,6 +153,72 @@ class JobRepository:
             session.commit()
             return [row.job_id for row in rows]
 
+    # ---- splat queue (GPU workers) -----------------------------------------------------------
+    def request_splat(self, job_id: str) -> dict[str, Any]:
+        with Session(self.engine) as session:
+            row = _require(session, job_id)
+            if row.splat_status == "running":
+                raise ValueError("A GPU worker is already training this splat.")
+            row.splat_status = "queued"
+            row.splat_stage = "Waiting for a GPU worker"
+            row.splat_progress = 0
+            row.splat_error = ""
+            row.splat_worker = ""
+            row.splat_updated_at = _now()
+            session.commit()
+            session.refresh(row)
+            return _public(row)
+
+    def claim_next_splat(self, worker: str) -> dict[str, Any] | None:
+        with Session(self.engine) as session:
+            query = (
+                select(JobRow)
+                .where(JobRow.splat_status == "queued", JobRow.source_path != "")
+                .order_by(JobRow.created_at, JobRow.job_id)
+                .limit(1)
+                .with_for_update(skip_locked=True)
+            )
+            row = session.scalar(query)
+            if row is None:
+                return None
+            row.splat_status = "running"
+            row.splat_stage = "Starting"
+            row.splat_progress = 0
+            row.splat_error = ""
+            row.splat_worker = worker[:80]
+            row.splat_updated_at = _now()
+            session.commit()
+            session.refresh(row)
+            return _public(row)
+
+    def save_splat(self, job_id: str, **fields: Any) -> dict[str, Any]:
+        allowed = {"splat_status", "splat_stage", "splat_progress", "splat_error", "ply_path"}
+        unknown = set(fields) - allowed
+        if unknown:
+            raise ValueError(f"not a splat field: {sorted(unknown)}")
+        with Session(self.engine) as session:
+            row = _require(session, job_id)
+            for key, value in fields.items():
+                if key == "splat_progress":
+                    value = max(0, min(100, int(value)))
+                setattr(row, key, value)
+            row.splat_updated_at = _now()
+            session.commit()
+            session.refresh(row)
+            return _public(row)
+
+    def fail_stale_splats(self, before: str, message: str) -> list[str]:
+        with Session(self.engine) as session:
+            rows = session.scalars(
+                select(JobRow).where(JobRow.splat_status == "running", JobRow.splat_updated_at < before)
+            ).all()
+            for row in rows:
+                row.splat_status = "failed"
+                row.splat_error = message
+                row.splat_updated_at = _now()
+            session.commit()
+            return [row.job_id for row in rows]
+
     def delete(self, job_id: str) -> bool:
         with Session(self.engine) as session:
             result = session.execute(delete(JobRow).where(JobRow.job_id == job_id))
@@ -183,4 +251,10 @@ def _public(row: JobRow) -> dict[str, Any]:
         "stage": row.stage,
         "progress": row.progress,
         "origin": row.origin,
+        "splat_status": row.splat_status,
+        "splat_stage": row.splat_stage,
+        "splat_progress": row.splat_progress,
+        "splat_error": row.splat_error,
+        "splat_worker": row.splat_worker,
+        "splat_updated_at": row.splat_updated_at,
     }

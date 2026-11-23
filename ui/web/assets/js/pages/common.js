@@ -29,7 +29,21 @@ export function projectCard(project, navigate) {
       project.status === "running" || project.status === "queued"
         ? h("div", { class: "card-progress" }, progressBar(project.progress, project.status), h("span", { class: "small muted", text: project.stage || "Waiting for a worker" }))
         : null,
-      project.status === "failed" ? h("div", { class: "small error-text", text: project.error || "Processing failed." }) : null));
+      project.status === "failed" ? h("div", { class: "small error-text", text: project.error || "Processing failed." }) : null,
+      splatLine(project)));
+}
+
+/** One line about the photoreal splat, or null when none was requested. */
+export function splatLine(project) {
+  const s = project.splat_status;
+  if (!s || s === "none") return null;
+  const text = {
+    queued: "Splat: waiting for a GPU worker",
+    running: `Splat: ${project.splat_stage || "training"} · ${project.splat_progress}%`,
+    succeeded: "Photoreal splat ready",
+    failed: "Splat failed",
+  }[s];
+  return h("div", { class: `splat-line splat-${s}` }, icon(s === "succeeded" ? "walk" : s === "failed" ? "alert" : "activity", 14), h("span", { text }));
 }
 
 export function pageHeader(title, subtitle, ...actions) {

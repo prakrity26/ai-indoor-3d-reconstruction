@@ -136,6 +136,8 @@ def create_app(store: JobStore | None = None, *, include_library: bool = False) 
     # ---- projects -------------------------------------------------------------------------
     @app.get("/jobs")
     def list_jobs() -> dict:
+        # A Colab worker can vanish without a word; do not show "training" forever.
+        jobs.recover_stale_splats(float(os.environ.get("SPLAT_STALE_MINUTES", "20")))
         return {"jobs": [_public(record) for record in jobs.list_jobs()]}
 
     @app.post("/jobs")
@@ -143,6 +145,7 @@ def create_app(store: JobStore | None = None, *, include_library: bool = False) 
         file: UploadFile = File(...),
         name: str = Form(""),
         description: str = Form(""),
+        splat: bool = Form(False),
     ) -> dict:
         filename = file.filename or "upload.mp4"
         suffix = Path(filename).suffix.lower()
@@ -159,6 +162,7 @@ def create_app(store: JobStore | None = None, *, include_library: bool = False) 
                 name=name,
                 description=description,
                 max_bytes=limit_mb * 1024 * 1024,
+                splat=splat,
             )
         except UploadTooLarge as exc:
             raise HTTPException(status_code=413, detail=f"Video is larger than {limit_mb} MB.") from exc
@@ -215,6 +219,16 @@ def create_app(store: JobStore | None = None, *, include_library: bool = False) 
             pass
         return _public(record, detail=True)
 
+    @app.post("/jobs/{job_id}/splat")
+    def request_splat(job_id: str) -> dict:
+        """Queue (or re-queue) Gaussian splat training for a GPU worker."""
+        _require(job_id)
+        try:
+            record = jobs.request_splat(job_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return _public(record, detail=True)
+
     @app.put("/jobs/{job_id}/visibility")
     def set_visibility(job_id: str, payload: dict = Body(...)) -> dict:
         _require(job_id)
@@ -248,7 +262,7 @@ def create_app(store: JobStore | None = None, *, include_library: bool = False) 
     def download_splat(job_id: str) -> FileResponse:
         record = _require(job_id)
         ply = splat_path(record)
-        if record["status"] != "succeeded" or ply is None:
+        if ply is None or (record["status"] != "succeeded" and record.get("splat_status") != "succeeded"):
             raise HTTPException(status_code=409, detail="The 3D file is not ready.")
         return FileResponse(ply, media_type="application/octet-stream", filename="point_cloud.ply")
 
@@ -319,7 +333,7 @@ def create_app(store: JobStore | None = None, *, include_library: bool = False) 
         mesh = mesh_path(record)
         scene = scene_path(record)
         evaluation = evaluation_document(record)
-        ready = record["status"] == "succeeded" and ply is not None
+        ready = ply is not None and (record["status"] == "succeeded" or record.get("splat_status") == "succeeded")
         public = record.get("visibility") == "public" and bool(record.get("share_token"))
         body = {
             "job_id": job_id,
@@ -338,6 +352,11 @@ def create_app(store: JobStore | None = None, *, include_library: bool = False) 
             "embed_url": f"/embed/{record['share_token']}" if public else "",
             "thumbnail_url": f"/jobs/{job_id}/thumbnail.jpg" if thumbnail_path(record) else "",
             "splat_url": f"/jobs/{job_id}/point_cloud.ply" if ready else "",
+            "splat_status": "succeeded" if ready and record.get("splat_status") in (None, "", "none") else record.get("splat_status") or "none",
+            "splat_stage": record.get("splat_stage") or "",
+            "splat_progress": int(record.get("splat_progress") or 0),
+            "splat_error": record.get("splat_error") or "",
+            "can_train_splat": bool(record.get("source_path")) and Path(record.get("source_path") or "").is_file(),
             "mesh_url": f"/jobs/{job_id}/mesh.glb" if mesh is not None else "",
             "scene_url": f"/jobs/{job_id}/scene.json" if scene is not None else "",
             "evaluation_url": f"/jobs/{job_id}/evaluation.json" if evaluation is not None else "",

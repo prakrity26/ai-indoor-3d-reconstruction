@@ -34,7 +34,7 @@
 <body>
   <div id="hud">
     <strong>Walkable Gaussian splat</strong>
-    Click the view, then move with <b>W A S D</b>. Mouse looks around. Esc releases the mouse.
+    Click the view, then move with <b>W A S D</b>, <b>Q</b>/<b>E</b> for down/up. Mouse looks around. Esc releases the mouse.
     <p id="status">Waiting for a splat PLY…</p>
     <p id="pick"><input id="file" type="file" accept=".ply,.splat" /></p>
   </div>
@@ -46,7 +46,7 @@
     const status = document.getElementById("status");
     const blocker = document.getElementById("blocker");
     const input = document.getElementById("file");
-    const keys = { KeyW: false, KeyA: false, KeyS: false, KeyD: false };
+    const keys = { KeyW: false, KeyA: false, KeyS: false, KeyD: false, KeyQ: false, KeyE: false };
     let viewer;
     let walk;
     let moveSpeed = 1.6;
@@ -78,6 +78,7 @@
         useBuiltInControls: false,
         sphericalHarmonicsDegree: 3,
       });
+      window.splatViewer = viewer; // console access for debugging
       walk = new PointerLockControls(viewer.camera, document.body);
       blocker.style.display = "flex";
       blocker.onclick = () => walk.lock();
@@ -85,37 +86,61 @@
       walk.addEventListener("unlock", () => { blocker.style.display = "flex"; });
     }
 
-    function frameCamera() {
+    // Which world axis points up differs by trainer: COLMAP / the in-repo gsplat trainer use -Y,
+    // Nerfstudio (splatfacto) exports use +Z. "auto" treats the thinnest axis of the room as
+    // vertical and picks that trainer's sign. ?up= or setSplatUp() overrides it.
+    const AXES = { "+x": [0, 1], "-x": [0, -1], "+y": [1, 1], "-y": [1, -1], "+z": [2, 1], "-z": [2, -1] };
+    let stats = null;
+    let resolvedUp = "-y";
+
+    function sceneStats() {
       const count = viewer.splatMesh.getSplatCount();
       const centers = new Float32Array(count * 3);
       viewer.splatMesh.fillSplatDataArrays(null, null, null, centers, null, null, true);
-      const xs = new Float32Array(count);
-      const ys = new Float32Array(count);
-      const zs = new Float32Array(count);
-      for (let i = 0; i < count; i++) {
-        xs[i] = centers[i * 3];
-        ys[i] = centers[i * 3 + 1];
-        zs[i] = centers[i * 3 + 2];
+      const lo = [], hi = [];
+      for (let axis = 0; axis < 3; axis++) {
+        const values = new Float32Array(count);
+        for (let i = 0; i < count; i++) values[i] = centers[i * 3 + axis];
+        lo.push(percentile(values, 0.1));
+        hi.push(percentile(values, 0.9));
       }
-      const minx = percentile(xs, 0.1);
-      const maxx = percentile(xs, 0.9);
-      const miny = percentile(ys, 0.1);
-      const maxy = percentile(ys, 0.9);
-      const minz = percentile(zs, 0.1);
-      const maxz = percentile(zs, 0.9);
-      const cx = 0.5 * (minx + maxx);
-      const cz = 0.5 * (minz + maxz);
-      const extent = Math.max(maxx - minx, maxy - miny, maxz - minz, 1);
-      // COLMAP / this viewer: -Y is up, so larger Y is the floor.
-      const eyeY = maxy + (miny - maxy) * 0.16;
+      return { lo, hi, ext: lo.map((l, k) => Math.max(hi[k] - l, 1e-3)) };
+    }
+
+    function resolveUp(spec, ext) {
+      if (AXES[spec]) return spec;
+      const thinnest = ext.indexOf(Math.min(...ext));
+      return ["+x", "-y", "+z"][thinnest];
+    }
+
+    function frameCamera(spec = "auto") {
+      stats = stats || sceneStats();
+      const { lo, hi, ext } = stats;
+      resolvedUp = resolveUp(spec, ext);
+      const [axis, sign] = AXES[resolvedUp];
+      const extent = Math.max(...ext, 1);
+      const eye = lo.map((l, k) => 0.5 * (l + hi[k]));
+      const floor = sign > 0 ? lo[axis] : hi[axis];
+      eye[axis] = floor + sign * 0.35 * ext[axis]; // about chest height above the floor
+      const horizontal = [0, 1, 2].filter((k) => k !== axis);
+      const forward = ext[horizontal[0]] >= ext[horizontal[1]] ? horizontal[0] : horizontal[1];
+      const target = [...eye];
+      target[forward] += extent * 0.25;
+      const up = [0, 0, 0];
+      up[axis] = sign;
       moveSpeed = extent * 0.18;
-      viewer.camera.up.set(0, -1, 0);
+      viewer.camera.up.set(...up);
       viewer.camera.near = Math.max(0.02, extent / 400);
       viewer.camera.far = extent * 40;
       viewer.camera.updateProjectionMatrix();
-      viewer.camera.position.set(cx, eyeY, cz);
-      viewer.camera.lookAt(cx, eyeY, cz + extent * 0.25);
+      viewer.camera.position.set(...eye);
+      viewer.camera.lookAt(...target);
+      return resolvedUp;
     }
+
+    // The studio calls this when the user flips the up axis.
+    window.setSplatUp = (spec) => (viewer && viewer.splatMesh ? frameCamera(spec) : null);
+    window.getSplatUp = () => resolvedUp;
 
     async function loadSplat(url, format) {
       status.textContent = "Loading splat…";
@@ -126,7 +151,8 @@
           showLoadingUI: true,
           splatAlphaRemovalThreshold: 1,
         });
-        frameCamera();
+        stats = null;
+        frameCamera(new URLSearchParams(location.search).get("up") || "auto");
         viewer.start();
         status.textContent = "Loaded. Click the view and walk with WASD.";
       } catch (err) {
@@ -150,6 +176,8 @@
       if (keys.KeyS) walk.moveForward(-moveSpeed * dt);
       if (keys.KeyA) walk.moveRight(-moveSpeed * dt);
       if (keys.KeyD) walk.moveRight(moveSpeed * dt);
+      if (keys.KeyE) viewer.camera.position.addScaledVector(viewer.camera.up, moveSpeed * dt);
+      if (keys.KeyQ) viewer.camera.position.addScaledVector(viewer.camera.up, -moveSpeed * dt);
     }
     requestAnimationFrame(tick);
 

@@ -20,6 +20,7 @@ log = logging.getLogger("reconstruction.jobs")
 
 STATUSES = ("queued", "running", "succeeded", "failed")
 STOPPED_MESSAGE = "The worker stopped while processing this job. Retry to run it again."
+SPLAT_LOST_MESSAGE = "The GPU worker stopped responding (Colab disconnects after a while). Train again to retry."
 VISIBILITIES = ("private", "public")
 _CHUNK = 1024 * 1024
 
@@ -61,8 +62,12 @@ class JobStore:
         name: str = "",
         description: str = "",
         max_bytes: int | None = None,
+        splat: bool = False,
     ) -> dict[str, Any]:
-        """Save the video (streamed in chunks when given a file object) and queue it."""
+        """Save the video (streamed in chunks when given a file object) and queue it.
+
+        ``splat=True`` also queues Gaussian splat training for a GPU worker.
+        """
         job_id = self._unique_id(job_id_from_filename(name or filename))
         folder = self.root / job_id
         folder.mkdir(parents=True, exist_ok=False)
@@ -84,6 +89,7 @@ class JobStore:
                 "name": _clean_line(name) or Path(filename).stem or job_id,
                 "description": _clean_block(description),
                 "stage": "queued",
+                "splat_status": "queued" if splat else "none",
             }
         )
 
@@ -156,7 +162,7 @@ class JobStore:
         record = self._require(job_id)
         if record["origin"] == "sample":
             raise PermissionError("Sample scenes cannot be deleted.")
-        if record["status"] == "running":
+        if record["status"] == "running" or record.get("splat_status") == "running":
             raise ValueError("Wait for the job to finish before deleting it.")
         for folder in [self.root / job_id, *(Path(d) / job_id for d in (extra_dirs or []))]:
             if folder.is_dir() and folder.name == job_id:
@@ -174,6 +180,36 @@ class JobStore:
         """Fail jobs stuck in ``running`` (a worker crashed or was killed) so they can be retried."""
         before = (datetime.now(timezone.utc) - timedelta(minutes=minutes)).isoformat(timespec="seconds")
         return self.repo.fail_stale(before, STOPPED_MESSAGE)
+
+    # ---- splat queue -----------------------------------------------------------------------
+    def request_splat(self, job_id: str) -> dict[str, Any]:
+        record = self._require(job_id)
+        if not record.get("source_path") or not Path(record["source_path"]).is_file():
+            raise ValueError("This project has no stored video to train a splat from.")
+        return self.repo.request_splat(job_id)
+
+    def claim_next_splat(self, worker: str = "") -> dict[str, Any] | None:
+        return self.repo.claim_next_splat(worker or "worker")
+
+    def splat_report(self, job_id: str, stage: str, progress: int) -> dict[str, Any]:
+        return self.repo.save_splat(job_id, splat_stage=stage[:120], splat_progress=progress)
+
+    def complete_splat(self, job_id: str, ply_path: str) -> dict[str, Any]:
+        return self.repo.save_splat(
+            job_id,
+            splat_status="succeeded",
+            splat_stage="done",
+            splat_progress=100,
+            splat_error="",
+            ply_path=str(Path(ply_path).resolve()),
+        )
+
+    def fail_splat(self, job_id: str, message: str) -> dict[str, Any]:
+        return self.repo.save_splat(job_id, splat_status="failed", splat_error=(message or "Splat training failed.")[:2000])
+
+    def recover_stale_splats(self, minutes: float) -> list[str]:
+        before = (datetime.now(timezone.utc) - timedelta(minutes=minutes)).isoformat(timespec="seconds")
+        return self.repo.fail_stale_splats(before, SPLAT_LOST_MESSAGE)
 
     def complete(self, job_id: str, ply_path: str, mesh_path: str = "") -> dict[str, Any]:
         stored = str(Path(ply_path).resolve()) if ply_path else ""

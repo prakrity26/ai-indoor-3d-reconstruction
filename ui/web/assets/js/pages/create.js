@@ -43,6 +43,7 @@ export async function render(main, _params, ctx) {
   const fileInput = h("input", { type: "file", accept: [...config.video_extensions, "video/*"].join(","), hidden: true, onChange: (e) => choose(e.target.files[0]) });
   const nameInput = h("input", { class: "input", placeholder: "e.g. Living room", maxlength: 120, required: true });
   const descInput = h("textarea", { class: "input", rows: 3, maxlength: 2000, placeholder: "What is this space? Anything viewers should know." });
+  const splatInput = h("input", { type: "checkbox", checked: true });
   const dropzone = h("div", { class: "dropzone", tabindex: 0, role: "button", "aria-label": "Choose a video to upload",
     onClick: () => fileInput.click(),
     onKeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInput.click(); } } });
@@ -95,7 +96,7 @@ export async function render(main, _params, ctx) {
     const label = h("span", { class: "small muted", text: "Uploading… 0%" });
     fill(progress, h("div", { class: "progress progress-running" }, fill), label);
     try {
-      const project = await api.upload(file, { name: nameInput.value, description: descInput.value }, (fraction) => {
+      const project = await api.upload(file, { name: nameInput.value, description: descInput.value, splat: splatInput.checked }, (fraction) => {
         const pct = Math.round(fraction * 100);
         fill.style.width = `${pct}%`;
         label.textContent = pct >= 100 ? "Saving on the server…" : `Uploading… ${pct}%`;
@@ -114,6 +115,9 @@ export async function render(main, _params, ctx) {
   h("h2", { text: "2. Describe the project" }),
   field("Project name", nameInput),
   field("Description (optional)", descInput),
+  h("div", { class: "option-card" },
+    h("label", { class: "check" }, splatInput, h("strong", { text: "Also train a photoreal Gaussian splat" })),
+    h("p", { class: "muted small", text: "Walkable, photo-realistic view of the room. Trained by a GPU worker (for example Colab) and usually takes 30–90 minutes. The mesh is built either way." })),
   progress,
   h("div", { class: "form-actions" }, button("Cancel", { onClick: () => ctx.navigate("#/") }), submit));
 

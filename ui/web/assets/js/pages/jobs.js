@@ -1,6 +1,6 @@
 import { api } from "../api.js";
 import { h, button, emptyState, statusBadge, progressBar, timeAgo, toast, iconButton, fill } from "../ui.js";
-import { pageHeader } from "./common.js";
+import { pageHeader, splatLine } from "./common.js";
 
 export async function render(main, _params, ctx) {
   let jobs = (await api.list()).filter((p) => p.origin !== "sample");
@@ -13,7 +13,9 @@ export async function render(main, _params, ctx) {
       h("td", { class: "stage-cell" },
         job.status === "failed"
           ? h("span", { class: "small error-text", text: job.error || "Failed" })
-          : h("div", {}, progressBar(job.progress, job.status), h("span", { class: "small muted", text: job.status === "succeeded" ? "Done" : job.stage || "Waiting for a worker" }))),
+          : h("div", {}, progressBar(job.progress, job.status), h("span", { class: "small muted", text: job.status === "succeeded" ? "Mesh done" : job.stage || "Waiting for a worker" })),
+        job.splat_status === "running" ? progressBar(job.splat_progress, "running") : null,
+        splatLine(job)),
       h("td", {}, h("span", { class: "muted small", text: timeAgo(job.created_at) })),
       h("td", { class: "right" },
         job.status === "succeeded" ? button("Open", { size: "sm", iconName: "cube", onClick: () => ctx.navigate(`#/studio/${job.job_id}`) }) : null,
@@ -24,7 +26,7 @@ export async function render(main, _params, ctx) {
   }
 
   function paint() {
-    const active = jobs.filter((j) => j.status === "queued" || j.status === "running").length;
+    const active = jobs.filter((j) => j.status === "queued" || j.status === "running" || j.splat_status === "queued" || j.splat_status === "running").length;
     if (!jobs.length) {
       fill(body, emptyState("activity", "No processing jobs", "Uploads appear here while the reconstruction worker processes them.", button("Create project", { kind: "primary", iconName: "plus", onClick: () => ctx.navigate("#/new") })));
       return;
@@ -48,7 +50,7 @@ export async function render(main, _params, ctx) {
     pageHeader("Processing jobs", "Each upload runs through frame extraction, camera poses, depth, point cloud, filtering, mesh, labels, and evaluation.",
       button("Refresh", { iconName: "refresh", onClick: reload })),
     body,
-    h("p", { class: "muted small footnote", text: "Jobs wait in the queue until a worker runs: python -m queue.workers --pipeline mesh (CPU) or --pipeline splat (CUDA GPU)." }));
+    h("p", { class: "muted small footnote", text: "Mesh jobs need: python -m queue.workers --pipeline mesh. Photoreal splats need a GPU worker: see notebooks/colab_gpu_worker.ipynb." }));
   const timer = setInterval(reload, 3000);
   return () => clearInterval(timer);
 }

@@ -1,11 +1,11 @@
 import { api } from "../api.js";
 import { h, button, icon, emptyState, statusBadge, progressBar, timeAgo } from "../ui.js";
-import { projectCard, pageHeader, captureTips } from "./common.js";
+import { projectCard, pageHeader, captureTips, splatLine } from "./common.js";
 
 export async function render(main, _params, ctx) {
   const projects = await api.list();
   const ready = projects.filter((p) => p.status === "succeeded");
-  const active = projects.filter((p) => p.status === "queued" || p.status === "running");
+  const active = projects.filter((p) => p.status === "queued" || p.status === "running" || p.splat_status === "queued" || p.splat_status === "running");
   const shared = projects.filter((p) => p.visibility === "public");
   const failed = projects.filter((p) => p.status === "failed");
 
@@ -38,7 +38,10 @@ export async function render(main, _params, ctx) {
                     h("div", { class: "job-mini-top" }, h("strong", { text: job.name }), statusBadge(job.status)),
                     job.status === "failed"
                       ? h("span", { class: "small error-text", text: job.error || "Failed" })
-                      : h("div", {}, progressBar(job.progress, job.status), h("span", { class: "small muted", text: `${job.stage || "Waiting for a worker"} · ${timeAgo(job.created_at)}` }))))))
+                      : job.status === "succeeded"
+                        ? null
+                        : h("div", {}, progressBar(job.progress, job.status), h("span", { class: "small muted", text: `${job.stage || "Waiting for a worker"} · ${timeAgo(job.created_at)}` })),
+                    splatLine(job)))))
             : h("p", { class: "muted small", text: "Nothing is processing right now." })),
         h("section", { class: "panel" },
           h("div", { class: "panel-head" }, h("h2", { text: "Capture tips" })),
@@ -51,7 +54,8 @@ export async function render(main, _params, ctx) {
       if (!latest) return;
       const changed = latest.some((p) => {
         const old = projects.find((o) => o.job_id === p.job_id);
-        return !old || old.status !== p.status || old.progress !== p.progress || old.stage !== p.stage;
+        return !old || old.status !== p.status || old.progress !== p.progress || old.stage !== p.stage
+          || old.splat_status !== p.splat_status || old.splat_progress !== p.splat_progress;
       });
       if (changed) ctx.refresh();
     }, 3000);
