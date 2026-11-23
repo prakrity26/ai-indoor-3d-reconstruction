@@ -5,6 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable
 
+Stage = Callable[[dict[str, Any]], None]
+Report = Callable[[str, int], None]
+
 
 class LocalResult:
     def __init__(self, mesh_path: str) -> None:
@@ -12,19 +15,51 @@ class LocalResult:
         self.ply_path = ""
 
 
+# (label shown in the UI, stage function name)
+STAGE_LABELS = (
+    ("Extracting frames", "_ingest"),
+    ("Selecting keyframes", "_select"),
+    ("Estimating camera poses", "_poses"),
+    ("Estimating depth", "_depth"),
+    ("Building point cloud", "_cloud"),
+    ("Filtering and fusing", "_filter"),
+    ("Reconstructing mesh", "_mesh"),
+    ("Labelling objects", "_scene"),
+    ("Evaluating", "_evaluate"),
+)
+
+
 def run_mesh_job(
     source: str,
     job_id: str,
-    stages: list[Callable[[dict[str, Any]], None]] | None = None,
+    stages: list[Stage] | None = None,
+    report: Report | None = None,
 ) -> LocalResult:
-    """Each stage reads and updates one state dict. Tests pass their own stages."""
+    """Each stage reads and updates one state dict. Tests pass their own stages.
+
+    ``report(label, percent)`` is called before each stage so the UI can show progress.
+    """
     state: dict[str, Any] = {"source": source, "job_id": job_id, "mesh_path": ""}
-    for stage in stages or default_stages():
+    chosen = stages or default_stages()
+    total = len(chosen)
+    for index, stage in enumerate(chosen):
+        if report is not None:
+            report(_label(stage, index), int(index * 100 / total))
         stage(state)
+    if report is not None:
+        report("Finishing", 99)
     return LocalResult(str(state.get("mesh_path") or ""))
 
 
-def default_stages() -> list[Callable[[dict[str, Any]], None]]:
+def _label(stage: Stage, index: int) -> str:
+    name = getattr(stage, "__name__", "")
+    for label, func in STAGE_LABELS:
+        if func == name:
+            return label
+    return f"Stage {index + 1}"
+
+
+def default_stages() -> list[Stage]:
     return [_ingest, _select, _poses, _depth, _cloud, _filter, _mesh, _scene, _evaluate]
 
 

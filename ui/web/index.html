@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Indoor Spaces</title>
+  <meta name="description" content="Turn smartphone videos of indoor spaces into interactive 3D scenes." />
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/assets/app.css" />
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
+  <script>
+    try {
+      var t = JSON.parse(localStorage.getItem("indoor3d.prefs") || "{}").theme;
+      if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+    } catch (e) {}
+  </script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <aside class="sidebar" aria-label="Main navigation">
+    <a class="brand" href="#/">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="M3 7l9 5 9-5M12 12v10"/></svg>
+      </span>
+      <span>Indoor Spaces</span>
+    </a>
+    <nav id="nav"></nav>
+    <div class="sidebar-foot">
+      <p>Capture · Reconstruct · Explore · Share</p>
+    </div>
+  </aside>
+  <div id="scrim" class="scrim"></div>
+  <div class="shell">
+    <header class="topbar">
+      <button id="nav-toggle" class="icon-btn" type="button" aria-label="Open navigation">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <span class="topbar-brand">Indoor Spaces</span>
+    </header>
+    <main id="main" class="main" tabindex="-1"></main>
+  </div>
+  <script type="module" src="/assets/js/main.js"></script>
+</body>
+</html>

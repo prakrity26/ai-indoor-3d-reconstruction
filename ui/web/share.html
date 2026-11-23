@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Shared scene · Indoor Spaces</title>
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/assets/app.css" />
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
+</head>
+<body class="share-page">
+  <header class="share-bar">
+    <div>
+      <strong id="title">Loading…</strong>
+      <span id="desc" class="muted small"></span>
+    </div>
+    <div id="views" class="view-chips"></div>
+  </header>
+  <div id="stage" class="share-stage"><div id="host" class="viewer-host"></div></div>
+  <a class="share-credit" href="/" target="_top">Made with Indoor Spaces</a>
+  <script type="module">
+    import { api } from "/assets/js/api.js";
+    import { h } from "/assets/js/ui.js";
+    import { createMeshViewer, createSplatViewer, viewerToolbar, toggleFullscreen } from "/assets/js/viewer.js";
+
+    const [, kind, token] = location.pathname.split("/");
+    if (kind === "embed") document.body.classList.add("embed");
+    const host = document.getElementById("host");
+    const stage = document.getElementById("stage");
+
+    try {
+      const { project, studio } = await api.shared(token);
+      document.title = `${project.name} · Indoor Spaces`;
+      document.getElementById("title").textContent = project.name;
+      document.getElementById("desc").textContent = project.description || "";
+      if (project.mesh_url) {
+        const viewer = createMeshViewer(host, { src: project.mesh_url });
+        viewer.setDoc(studio);
+        host.append(viewerToolbar({
+          onReset: () => viewer.reset(),
+          onZoomIn: () => viewer.zoom(1),
+          onZoomOut: () => viewer.zoom(-1),
+          onAutoRotate: (on) => viewer.setAutoRotate(on),
+          autoRotate: studio.settings.auto_rotate,
+          onFullscreen: () => toggleFullscreen(stage),
+        }));
+        document.getElementById("views").replaceChildren(...studio.viewpoints.map((view) =>
+          h("button", { type: "button", class: "chip", onClick: () => viewer.goTo(view), text: view.name })));
+      } else if (project.splat_url) {
+        createSplatViewer(host, project.splat_url);
+        host.append(viewerToolbar({ onFullscreen: () => toggleFullscreen(stage) }));
+      }
+    } catch (error) {
+      document.getElementById("title").textContent = "Scene unavailable";
+      host.replaceChildren(h("div", { class: "empty" }, h("h3", { text: "This scene is not available" }), h("p", { class: "muted", text: error.message })));
+    }
+  </script>
+</body>
+</html>

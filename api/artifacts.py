@@ -183,3 +183,33 @@ def _int(value: Any) -> int | None:
     if isinstance(value, float) and value.is_integer():
         return int(value)
     return None
+
+
+def thumbnail_path(record: dict[str, Any]) -> Path | None:
+    """A representative JPEG: a sample preview, else the first extracted frame."""
+    job_id = record["job_id"]
+    for folder in (samples_root() / job_id / "preview", frames_root() / job_id / "frames"):
+        if folder.is_dir():
+            try:
+                names = sorted(entry.name for entry in os.scandir(folder) if entry.name.lower().endswith((".jpg", ".jpeg")))
+            except OSError:
+                continue
+            if names:
+                return folder / names[0]
+    return None
+
+
+def input_report(record: dict[str, Any]) -> dict[str, Any]:
+    """Video facts and quality warnings written by Phase 1 (preprocessing manifest)."""
+    manifest = _read_json(frames_root() / record["job_id"] / "manifest.json")
+    if not manifest:
+        return {}
+    video = manifest.get("video") if isinstance(manifest.get("video"), dict) else {}
+    warnings = manifest.get("warnings") if isinstance(manifest.get("warnings"), list) else []
+    facts = {key: video.get(key) for key in ("width", "height", "fps", "duration_sec", "frame_count") if key in video}
+    clean = [
+        {"severity": str(w.get("severity", "info")), "code": str(w.get("code", "")), "message": str(w.get("message", ""))}
+        for w in warnings
+        if isinstance(w, dict)
+    ]
+    return {"video": facts, "warnings": clean, "frames": len(manifest.get("frames") or [])}

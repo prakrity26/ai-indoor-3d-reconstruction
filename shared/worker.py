@@ -11,17 +11,19 @@ from shared.jobs import default_store, serve
 from shared.local_job import run_mesh_job
 
 
-def train_splat(source: str, job_id: str):
+def train_splat(source: str, job_id: str, report=None):
     from model.splat.pipeline import reconstruct_gaussian_splat
 
+    if report is not None:
+        report("Training Gaussian splat (GPU)", 5)
     root = os.environ.get("SPLAT_KEEP_ROOT", "").strip()
     if root:
         os.environ["SPLAT_KEEP_DIR"] = str(Path(root) / job_id)
     return reconstruct_gaussian_splat(source, job_id=job_id)
 
 
-def train_mesh(source: str, job_id: str):
-    return run_mesh_job(source, job_id)
+def train_mesh(source: str, job_id: str, report=None):
+    return run_mesh_job(source, job_id, report=report)
 
 
 def main(argv: list[str] | None = None) -> None:

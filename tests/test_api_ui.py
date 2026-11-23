@@ -14,7 +14,7 @@ from ui.board import describe
 
 def test_sample_mesh_is_listed_and_downloadable(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("FRAMES_DIR", str(tmp_path / "frames"))
-    client = TestClient(create_app(JobStore(Path("data/jobs")), include_library=True))
+    client = TestClient(create_app(JobStore(tmp_path / "jobs"), include_library=True))
     listed = client.get("/jobs")
     assert listed.status_code == 200
     sample = next(item for item in listed.json()["jobs"] if item["job_id"] == "img7916")
@@ -39,14 +39,15 @@ def test_sample_mesh_is_listed_and_downloadable(monkeypatch: pytest.MonkeyPatch,
     assert client.get("/jobs/img7916/point_cloud.ply").status_code == 409
 
 
-def test_studio_and_orbit_pages_load() -> None:
-    client = TestClient(create_app(include_library=True))
-    studio = client.get("/")
+def test_platform_and_orbit_pages_load(tmp_path: Path) -> None:
+    client = TestClient(create_app(JobStore(tmp_path / "jobs"), include_library=True))
+    platform = client.get("/")
     orbit = client.get("/orbit")
-    assert studio.status_code == 200
-    assert "Indoor scenes" in studio.text
-    assert 'id="view"' in studio.text
-    assert "Walk" in studio.text
+    assert platform.status_code == 200
+    assert "Indoor Spaces" in platform.text
+    assert "/assets/js/main.js" in platform.text
+    assert client.get("/assets/js/main.js").status_code == 200
+    assert client.get("/assets/app.css").status_code == 200
     assert orbit.status_code == 200
     assert "model-viewer" in orbit.text
 
