@@ -138,6 +138,19 @@ class JobRepository:
             session.refresh(row)
             return _public(row)
 
+    def fail_stale(self, before: str, message: str) -> list[str]:
+        """Fail running jobs whose last progress update is older than ``before`` (ISO time)."""
+        with Session(self.engine) as session:
+            rows = session.scalars(
+                select(JobRow).where(JobRow.status == "running", JobRow.updated_at < before)
+            ).all()
+            for row in rows:
+                row.status = "failed"
+                row.error = message
+                row.updated_at = _now()
+            session.commit()
+            return [row.job_id for row in rows]
+
     def delete(self, job_id: str) -> bool:
         with Session(self.engine) as session:
             result = session.execute(delete(JobRow).where(JobRow.job_id == job_id))

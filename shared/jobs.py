@@ -3,18 +3,23 @@
 from __future__ import annotations
 
 import inspect
+import logging
 import os
 import re
 import secrets
 import shutil
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, BinaryIO, Callable
 
 from database.repositories.jobs import JobRepository
 from database.session import sqlite_url
 
+log = logging.getLogger("reconstruction.jobs")
+
 STATUSES = ("queued", "running", "succeeded", "failed")
+STOPPED_MESSAGE = "The worker stopped while processing this job. Retry to run it again."
 VISIBILITIES = ("private", "public")
 _CHUNK = 1024 * 1024
 
@@ -165,6 +170,11 @@ class JobStore:
     def report(self, job_id: str, stage: str, progress: int) -> None:
         self.repo.save_progress(job_id, stage, progress)
 
+    def recover_stale(self, minutes: float) -> list[str]:
+        """Fail jobs stuck in ``running`` (a worker crashed or was killed) so they can be retried."""
+        before = (datetime.now(timezone.utc) - timedelta(minutes=minutes)).isoformat(timespec="seconds")
+        return self.repo.fail_stale(before, STOPPED_MESSAGE)
+
     def complete(self, job_id: str, ply_path: str, mesh_path: str = "") -> dict[str, Any]:
         stored = str(Path(ply_path).resolve()) if ply_path else ""
         mesh = str(Path(mesh_path).resolve()) if mesh_path else ""
@@ -223,6 +233,8 @@ def process_next(store: JobStore, train: Callable) -> bool:
     if job is None:
         return False
     job_id = job["job_id"]
+    started = time.monotonic()
+    log.info("job %s: started", job_id)
     try:
         kwargs: dict[str, Any] = {"job_id": job_id}
         if _accepts_report(train):
@@ -242,9 +254,16 @@ def process_next(store: JobStore, train: Callable) -> bool:
         if not ply_ok and not mesh_ok:
             raise RuntimeError("The worker finished without a splat or a mesh.")
         store.complete(job_id, ply if ply_ok else "", mesh if mesh_ok else "")
+        log.info("job %s: succeeded in %.0fs", job_id, time.monotonic() - started)
     except Exception as exc:
         message = getattr(exc, "message", None) or str(exc) or exc.__class__.__name__
         store.fail(job_id, message)
+        log.warning("job %s: failed after %.0fs: %s", job_id, time.monotonic() - started, message)
+    except BaseException:
+        # SIGTERM / Ctrl-C mid-job: record it instead of leaving the job "running" forever.
+        store.fail(job_id, STOPPED_MESSAGE)
+        log.warning("job %s: interrupted", job_id)
+        raise
     return True
 
 
@@ -257,8 +276,14 @@ def serve(
     wait: Callable[[float], None] | None = None,
 ) -> None:
     pause = wait or _sleep
+    stale_minutes = float(os.environ.get("WORKER_STALE_MINUTES", "180"))
+    last_sweep: float | None = None
 
     while True:
+        if last_sweep is None or time.monotonic() - last_sweep > 300:
+            last_sweep = time.monotonic()
+            for job_id in store.recover_stale(stale_minutes):
+                log.warning("job %s: no progress for %.0f minutes; marked failed", job_id, stale_minutes)
         if process_next(store, train):
             continue
         if once:

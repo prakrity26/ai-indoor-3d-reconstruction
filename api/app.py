@@ -75,12 +75,18 @@ def create_app(store: JobStore | None = None, *, include_library: bool = False) 
         app.mount("/assets", StaticFiles(directory=_WEB / "assets"), name="assets")
 
     @app.middleware("http")
-    async def revalidate_assets(request, call_next):
+    async def response_headers(request, call_next):
         # The frontend has no build step or hashed filenames, so browsers must revalidate
         # (ETag) instead of running stale modules after an update.
         response = await call_next(request)
-        if request.url.path.startswith("/assets/"):
+        path = request.url.path
+        if path.startswith("/assets/"):
             response.headers["Cache-Control"] = "no-cache"
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        # Only the public embed page (and the splat viewer it frames) may be framed elsewhere.
+        if not (path.startswith("/embed/") or path == "/viewer"):
+            response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
         return response
 
     # ---- pages ----------------------------------------------------------------------------

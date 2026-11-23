@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true  # tests read the sample mesh in samples/
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+      - name: Install (no PyTorch; depth tests use stubs)
+        run: pip install ".[dev,api,db,queue,cloud]"
+      - name: Run tests
+        run: python -m pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Syntax-check the web platform modules
+        run: for f in ui/web/assets/js/*.js ui/web/assets/js/pages/*.js; do node --check "$f"; done
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Validate compose file
+        run: docker compose config -q
+      - name: Build the api image
+        run: docker build --target api -t indoor3d-api:ci .
+      - name: Smoke-test the api image
+        run: |
+          docker run -d --name api -p 8000:8000 indoor3d-api:ci
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/health && break; sleep 2; done
+          curl -fsS http://127.0.0.1:8000/ | grep -q "Indoor Spaces"
+          curl -fsS http://127.0.0.1:8000/jobs | grep -q img7916
+          docker logs api

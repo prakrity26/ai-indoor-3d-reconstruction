@@ -198,3 +198,35 @@ def test_old_database_gains_project_columns(tmp_path: Path) -> None:
     store = JobStore(tmp_path)
     old = store.get("old")
     assert old["visibility"] == "private" and old["origin"] == "upload" and old["progress"] == 0
+
+
+def test_stale_running_jobs_are_failed_and_retryable(env) -> None:
+    store, client, _ = env
+    job_id = _upload(client)["job_id"]
+    store.claim_next()
+    assert store.recover_stale(minutes=60) == []  # fresh progress, still running
+    assert store.recover_stale(minutes=-1) == [job_id]
+    failed = client.get(f"/jobs/{job_id}").json()
+    assert failed["status"] == "failed" and "Retry" in failed["error"]
+    assert client.post(f"/jobs/{job_id}/retry").json()["status"] == "queued"
+
+
+def test_interrupted_job_is_not_left_running(env) -> None:
+    store, client, _ = env
+    job_id = _upload(client)["job_id"]
+
+    def train(source: str, job_id: str):
+        raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        process_next(store, train)
+    assert store.get(job_id)["status"] == "failed"
+
+
+def test_security_headers(env) -> None:
+    _, client, _ = env
+    page = client.get("/")
+    assert page.headers["x-content-type-options"] == "nosniff"
+    assert page.headers["x-frame-options"] == "SAMEORIGIN"
+    assert client.get("/assets/app.css").headers["cache-control"] == "no-cache"
+    assert "x-frame-options" not in client.get("/embed/anything").headers

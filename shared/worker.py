@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import os
+import signal
+import sys
 from pathlib import Path
 
 from shared.broker import wait
@@ -36,6 +39,12 @@ def main(argv: list[str] | None = None) -> None:
         help="splat needs CUDA. mesh runs Phases 1–9 on this machine.",
     )
     args = parser.parse_args(argv)
+    logging.basicConfig(
+        level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+    # docker stop sends SIGTERM: exit through SystemExit so the current job is marked failed.
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
     store = default_store()
     train = train_mesh if args.pipeline == "mesh" else train_splat
     print(f"{args.pipeline} worker watching {store.root}", flush=True)
