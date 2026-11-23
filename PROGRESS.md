@@ -21,7 +21,8 @@ This file is the public progress note. Detailed daily/weekly notes stay in the l
 | Phase 15 hardening and CI | Done; streamed uploads with limits, security headers, stale-job recovery, GitHub Actions |
 | Phase 16 documentation | Done; README, module READMEs, this log |
 | Sample mesh + filtered cloud | `samples/img7916/` (Git LFS), from clip `IMG_7916` |
-| Walkable Gaussian splat (`IMG_7916`) | Training path works on Colab GPU; PLY not in the repo yet |
+| Remote GPU splat worker | Done; worker gateway + `colab_gpu_worker.ipynb` (splatfacto), progress in the UI, Walk mode in Studio and share page |
+| Walkable Gaussian splat (`IMG_7916`) | Next: run the Colab worker on the IMG_7916 upload |
 
 ## What the sample output is
 

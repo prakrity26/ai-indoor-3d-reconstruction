@@ -8,7 +8,7 @@ Capture → Upload → Process → Reconstruct → Explore → Edit → Save →
 
 This is an internship engineering project. The reconstruction engine is a reusable module behind a REST API, so other company products can call it without the web platform.
 
-**Status:** all 16 phases are implemented. The reconstruction pipeline (Phases 1–9), the API, job database, worker, web platform, Docker stack, CI, and documentation are in this repository. A walkable Gaussian splat is trained on a CUDA GPU (Colab); the trained PLY for the sample clip is not in git yet. See [PROGRESS.md](PROGRESS.md).
+**Status:** all 16 phases are implemented: the reconstruction pipeline (Phases 1–9), the API, job database, workers, web platform, Docker stack, CI, and documentation. Photoreal Gaussian splats are trained by a GPU worker (e.g. Colab) connected through a token-protected gateway; see [Photoreal splats on a GPU](#photoreal-splats-on-a-gpu). See [PROGRESS.md](PROGRESS.md).
 
 | | |
 |---|---|
@@ -74,6 +74,54 @@ A shared scene opens at `/s/<token>` (read-only viewer with hotspots and views).
 
 They are different formats with different viewers. A splat is not rendered as a GLB mesh.
 
+## Photoreal splats on a GPU
+
+The mesh is built on your machine. The photoreal, walkable **Gaussian splat** needs an NVIDIA GPU,
+so it is trained by a **GPU worker** that can run anywhere, including a free Google Colab session.
+Tick *Also train a photoreal Gaussian splat* when you upload (or press **Train photoreal splat**
+on a project page), start a worker, and the splat appears in the 3D Studio's **Walk** mode.
+
+```text
+laptop: web platform :8000 · worker gateway :8001 ◄── cloudflared tunnel ── Colab: GPU worker
+```
+
+The worker gateway is a separate app with only the worker routes, protected by a token, so the
+tunnel never exposes the platform itself.
+
+**1. On your laptop**, in three terminals (with the venv active):
+
+```bash
+python -m api                                    # the platform, http://127.0.0.1:8000
+```
+
+```bash
+export WORKER_TOKEN=$(python -c "import secrets; print(secrets.token_urlsafe(32))")
+echo "$WORKER_TOKEN"                             # copy this for Colab
+python -m api.worker_gateway                     # worker gateway on :8001
+```
+
+```bash
+cloudflared tunnel --url http://localhost:8001   # prints https://<random>.trycloudflare.com
+```
+
+**2. In Colab**, open [`notebooks/colab_gpu_worker.ipynb`](notebooks/colab_gpu_worker.ipynb)
+(File → Open notebook → GitHub → `prakrity26/ai-indoor-3d-reconstruction`), choose a GPU runtime,
+run the cells, and paste the tunnel URL and token when asked. Leave the last cell running.
+
+**3. Watch it**: Processing jobs and the project page show *Estimating camera poses → Training
+Gaussians · step N/30000 → Uploading*. On a T4, 30,000 steps take roughly 45–90 minutes. When it
+finishes, open the project in the 3D Studio and switch to **Walk** (W A S D, Q/E for down/up). If
+the room looks sideways, press the ↕ **Flip up direction** button and Save.
+
+Details:
+
+- Trainer: Nerfstudio **splatfacto** by default (`--backend gsplat` uses the in-repo trainer).
+- A Colab disconnect is detected after `SPLAT_STALE_MINUTES` (default 20) without progress; press **Train again**.
+- With `SPLAT_KEEP_ROOT` set (the notebook uses Google Drive), each splat is also copied there before upload.
+- On a CUDA machine that shares the database, skip the gateway: `python -m queue.workers --pipeline splat`.
+- Docker: `docker compose --profile gpu up -d worker-gateway` runs the gateway (set `WORKER_TOKEN` in `.env`).
+- Filming matters most: a slow, overlapping walk (three loops at different heights) gives a far better splat than a fast pan.
+
 ## Architecture
 
 ```text
@@ -102,12 +150,13 @@ They are different formats with different viewers. A splat is not rendered as a 
 | `GET /jobs` · `POST /jobs` | List projects · upload a video (`file`, `name`, `description`) |
 | `GET /jobs/{id}` · `PATCH /jobs/{id}` · `DELETE /jobs/{id}` | Read (with stage, progress, input warnings, artifacts) · rename/describe · delete everything the job wrote |
 | `POST /jobs/{id}/retry` | Re-queue a failed job |
+| `POST /jobs/{id}/splat` | Queue (or re-queue) photoreal splat training for a GPU worker |
 | `GET\|PUT /jobs/{id}/studio.json` | Hotspots, viewpoints, scene settings |
 | `PUT /jobs/{id}/visibility` · `POST /jobs/{id}/share/rotate` | `private` / `public`; issue a new share token |
 | `GET /shared/{token}` | Public, read-only project + studio document |
 | `GET /jobs/{id}/mesh.glb` · `point_cloud.ply` · `scene.json` · `evaluation.json` · `thumbnail.jpg` · `source` | Files |
 
-Interactive docs: http://127.0.0.1:8000/docs.
+Interactive docs: http://127.0.0.1:8000/docs. The worker gateway (`python -m api.worker_gateway`, bearer token) serves `POST /worker/claim`, `GET /worker/jobs/{id}/source`, `POST /worker/jobs/{id}/progress`, `PUT /worker/jobs/{id}/result`, and `POST /worker/jobs/{id}/fail`.
 
 ## Reconstruction pipeline (CLI)
 
@@ -162,7 +211,8 @@ Copy `.env.example` to `.env`. Key settings: `DATABASE_URL` (empty → SQLite in
 
 - **No authentication.** Single-user mode. "Private" means "no share link"; file URLs are not access-controlled. Put the app behind a trusted network or add auth before exposing it publicly.
 - Mesh quality is coarse and can look incomplete; scale is relative.
-- Walkable splats need a CUDA GPU and COLMAP; the Docker worker runs only the mesh pipeline.
+- Walkable splats need a CUDA GPU; the Docker worker runs only the mesh pipeline, and splats come from a GPU worker (Colab or a cloud GPU).
+- The splat viewer (GaussianSplats3D) did not render in the WebKit-based preview browser used during development; use a current Chrome, Edge, or Firefox for Walk mode.
 - Hotspots are placed on the mesh (Orbit mode), not inside the splat viewer.
 - Media markers link to images/videos by URL; files are not uploaded to the platform.
 - 360° video is out of scope for this version.

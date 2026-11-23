@@ -20,4 +20,19 @@ Reliability:
 - `SIGTERM` (e.g. `docker stop`) or Ctrl-C mid-job marks the job failed instead of leaving it `running`.
 - Every 5 minutes the worker fails jobs whose progress has not changed for `WORKER_STALE_MINUTES` (default 180), which covers a worker that was killed outright.
 
+## Splat workers (GPU)
+
+Splat training is tracked separately from the mesh (`splat_status` on each project), so a mesh
+worker on the laptop and a GPU worker elsewhere never compete for the same job.
+
+```bash
+python -m queue.workers --pipeline splat                                   # CUDA host sharing the database
+python -m queue.workers --pipeline splat --gateway https://… --token …     # anywhere, through api.worker_gateway
+```
+
+The remote worker downloads the video, runs the trainer (`--backend splatfacto` by default, or
+`gsplat`), posts progress every few seconds plus a heartbeat every minute, and uploads the PLY. If
+the server stops treating the job as running (stale, retried, deleted), the worker cancels the
+training process group and moves on. Network calls through the tunnel are retried.
+
 Redis support needs `pip install -e ".[queue]"`.
