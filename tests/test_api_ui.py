@@ -29,6 +29,9 @@ def test_sample_mesh_is_listed_and_downloadable(monkeypatch: pytest.MonkeyPatch,
     mesh = client.get("/jobs/img7916/mesh.glb")
     assert mesh.status_code == 200
     assert mesh.content.startswith(b"glTF")
+    # The walk viewer probes with HEAD before downloading, so HEAD must not be a 405.
+    head = client.head("/jobs/img7916/mesh.glb")
+    assert head.status_code == 200 and head.content == b""
 
     evaluation = client.get("/jobs/img7916/evaluation.json")
     assert evaluation.status_code == 200
@@ -37,6 +40,7 @@ def test_sample_mesh_is_listed_and_downloadable(monkeypatch: pytest.MonkeyPatch,
     assert body["posed_ratio"] == round(17 / 70, 4)
     assert client.get("/jobs/img7916/scene.json").status_code == 404
     assert client.get("/jobs/img7916/point_cloud.ply").status_code == 409
+    assert client.head("/jobs/img7916/point_cloud.ply").status_code == 409
 
 
 def test_platform_and_orbit_pages_load(tmp_path: Path) -> None:

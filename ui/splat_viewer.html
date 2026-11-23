@@ -2,24 +2,37 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Walkable indoor splat</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Walk the space</title>
   <style>
-    html, body { margin: 0; height: 100%; background: #0b0d12; color: #eee; font-family: system-ui, sans-serif; overflow: hidden; }
-    #hud {
-      position: absolute; z-index: 2; left: 12px; top: 12px;
-      padding: 12px 16px; background: rgba(0,0,0,.62); max-width: 28rem;
-      border-radius: 8px; line-height: 1.4; font-size: 0.92rem;
-    }
-    #hud strong { display: block; margin-bottom: 6px; }
-    canvas { display: block; width: 100%; height: 100%; }
-    #blocker {
-      display: none; position: absolute; inset: 0; z-index: 3;
-      background: rgba(0,0,0,.35); align-items: center; justify-content: center;
-      font-size: 1.1rem; cursor: pointer;
-    }
-    body.embed #hud { left: 50%; right: auto; top: auto; bottom: 16px; transform: translateX(-50%); text-align: center; }
-    body.embed #hud strong, body.embed #pick { display: none; }
+    :root { --bg: #0b0d12; --panel: rgba(12, 14, 20, .72); --line: rgba(255,255,255,.14); --text: #f2f3f5; --muted: #b6bac4; --accent: #7aa2ff; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+    canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+    canvas:active { cursor: grabbing; }
+    .panel { position: absolute; z-index: 4; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+    #status { left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 18px 22px; text-align: center; max-width: min(28rem, calc(100vw - 32px)); }
+    #status[hidden] { display: none; }
+    #bar { height: 4px; margin-top: 12px; border-radius: 4px; background: var(--line); overflow: hidden; }
+    #bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+    #toolbar { left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; gap: 4px; padding: 6px; }
+    #toolbar[hidden] { display: none; }
+    #toolbar button { appearance: none; border: 0; background: transparent; color: var(--text); padding: 8px 12px; border-radius: 8px; font: inherit; cursor: pointer; white-space: nowrap; }
+    #toolbar button:hover { background: rgba(255,255,255,.08); }
+    #toolbar button[aria-pressed="true"] { background: var(--accent); color: #0b0d12; }
+    #toolbar .sep { width: 1px; background: var(--line); margin: 4px 2px; }
+    #help { right: 16px; top: 16px; padding: 12px 14px; max-width: 17rem; color: var(--muted); }
+    #help[hidden] { display: none; }
+    #help strong { color: var(--text); display: block; margin-bottom: 4px; }
+    #help kbd { background: rgba(255,255,255,.1); border-radius: 4px; padding: 0 5px; color: var(--text); font: 12px ui-monospace, monospace; }
+    #help p { margin: 4px 0; }
+    #help .close { position: absolute; right: 6px; top: 4px; background: none; border: 0; color: var(--muted); font-size: 18px; cursor: pointer; }
+    #pick { margin-top: 12px; }
+    #stick { position: absolute; z-index: 5; width: 112px; height: 112px; border-radius: 50%; border: 1px solid var(--line); background: rgba(255,255,255,.06); display: none; pointer-events: none; transform: translate(-50%, -50%); }
+    #stick > i { position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; margin: -22px; border-radius: 50%; background: rgba(255,255,255,.35); }
+    #reticle { position: absolute; z-index: 3; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%; background: rgba(255,255,255,.7); box-shadow: 0 0 0 1px rgba(0,0,0,.4); pointer-events: none; }
+    #reticle[hidden] { display: none; }
+    body.embed #help { display: none; }
+    @media (max-width: 640px) { #toolbar button { padding: 8px 9px; } #toolbar .wide { display: none; } #help { left: 12px; right: 12px; max-width: none; } }
   </style>
   <script type="importmap">
   {
@@ -32,186 +45,421 @@
   </script>
 </head>
 <body>
-  <div id="hud">
-    <strong>Walkable Gaussian splat</strong>
-    Click the view, then move with <b>W A S D</b>, <b>Q</b>/<b>E</b> for down/up. Mouse looks around. Esc releases the mouse.
-    <p id="status">Waiting for a splat PLY…</p>
-    <p id="pick"><input id="file" type="file" accept=".ply,.splat" /></p>
+  <div id="status" class="panel">
+    <div id="message">Waiting for a splat…</div>
+    <div id="bar" hidden><i></i></div>
+    <div id="pick"><input id="file" type="file" accept=".ply,.splat,.ksplat" /></div>
   </div>
-  <div id="blocker">Click to walk</div>
+  <div id="reticle" hidden></div>
+  <div id="stick"><i></i></div>
+  <div id="help" class="panel" hidden>
+    <button class="close" type="button" aria-label="Hide help">×</button>
+    <strong>Walk the space</strong>
+    <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows to walk, <kbd>Shift</kbd> to go faster</p>
+    <p>Drag to look around · double-click to glide there</p>
+    <p><kbd>Q</kbd>/<kbd>E</kbd> lower / raise eye height</p>
+    <p>On a phone: left thumb moves, right thumb looks</p>
+    <p><kbd>O</kbd> orbit view · <kbd>T</kbd> tour · <kbd>F</kbd> fullscreen · <kbd>R</kbd> reset</p>
+  </div>
+  <nav id="toolbar" class="panel" hidden aria-label="Viewer controls">
+    <button id="b-walk" type="button" aria-pressed="true">Walk</button>
+    <button id="b-orbit" type="button" aria-pressed="false">Orbit</button>
+    <button id="b-tour" type="button" aria-pressed="false">Tour</button>
+    <span class="sep"></span>
+    <button id="b-reset" type="button" class="wide">Reset</button>
+    <button id="b-quality" type="button" class="wide" aria-pressed="true">HD</button>
+    <button id="b-help" type="button">?</button>
+    <button id="b-full" type="button">⛶</button>
+  </nav>
   <script type="module">
+    import * as THREE from "three";
     import * as GaussianSplats3D from "@mkkellogg/gaussian-splats-3d";
-    import { PointerLockControls } from "three/addons/controls/PointerLockControls.js";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-    const status = document.getElementById("status");
-    const blocker = document.getElementById("blocker");
-    const input = document.getElementById("file");
-    const keys = { KeyW: false, KeyA: false, KeyS: false, KeyD: false, KeyQ: false, KeyE: false };
-    let viewer;
-    let walk;
-    let moveSpeed = 1.6;
+    const $ = (id) => document.getElementById(id);
+    const params = new URLSearchParams(location.search);
+    const embed = params.get("embed") === "1";
+    if (embed) document.body.classList.add("embed");
+
+    let viewer = null;
+    let orbit = null;
+    let mode = "walk";            // walk | orbit | tour
+    let stats = null;             // robust bounds of the splat centres
+    let resolvedUp = "-y";
+    let speed = 1.6;              // metres-ish per second, scaled to the room
+    let home = null;              // { position, yaw, pitch } after framing
+    let hd = true;
+
+    // ---- camera state: yaw/pitch around the room's up axis ---------------------------------------
+    const UP = new THREE.Vector3(0, -1, 0);
+    const basis = { up: new THREE.Vector3(), fwd0: new THREE.Vector3(), right0: new THREE.Vector3() };
+    let yaw = 0, pitch = 0;
+    const velocity = new THREE.Vector3();
+    const glide = { active: false, to: new THREE.Vector3() };
+
+    function setBasis(up, forwardHint) {
+      basis.up.copy(up).normalize();
+      basis.fwd0.copy(forwardHint).projectOnPlane(basis.up).normalize();
+      basis.right0.crossVectors(basis.fwd0, basis.up).normalize();
+    }
+    function lookDirection(out = new THREE.Vector3()) {
+      const flat = basis.fwd0.clone().applyAxisAngle(basis.up, yaw);
+      const side = new THREE.Vector3().crossVectors(flat, basis.up).normalize();
+      return out.copy(flat).applyAxisAngle(side, pitch).normalize();
+    }
+    function flatForward() { return basis.fwd0.clone().applyAxisAngle(basis.up, yaw); }
+    function applyLook() {
+      const cam = viewer.camera;
+      cam.up.copy(basis.up);
+      cam.lookAt(cam.position.clone().add(lookDirection()));
+    }
+
+    // ---- scene framing --------------------------------------------------------------------------
+    // Which world axis points up differs by trainer: COLMAP / the in-repo gsplat trainer use -Y,
+    // Nerfstudio (splatfacto) exports use +Z. "auto" treats the thinnest axis of the room as
+    // vertical and picks that trainer's sign. ?up= or setSplatUp() overrides it.
+    const AXES = { "+x": [0, 1], "-x": [0, -1], "+y": [1, 1], "-y": [1, -1], "+z": [2, 1], "-z": [2, -1] };
+
+    function percentile(values, p) {
+      const sorted = Float32Array.from(values).sort();
+      return sorted[Math.min(sorted.length - 1, Math.max(0, Math.floor(p * (sorted.length - 1))))];
+    }
+    function sceneStats() {
+      const count = viewer.splatMesh.getSplatCount();
+      const centers = new Float32Array(count * 3);
+      viewer.splatMesh.fillSplatDataArrays(null, null, null, centers, null, null, true);
+      const step = Math.max(1, Math.floor(count / 200000)); // sample big scenes
+      const lo = [], hi = [];
+      for (let axis = 0; axis < 3; axis++) {
+        const values = new Float32Array(Math.ceil(count / step));
+        for (let i = 0, j = 0; i < count; i += step, j++) values[j] = centers[i * 3 + axis];
+        lo.push(percentile(values, 0.05));
+        hi.push(percentile(values, 0.95));
+      }
+      return { lo, hi, ext: lo.map((l, k) => Math.max(hi[k] - l, 1e-3)) };
+    }
+    function resolveUp(spec, ext) {
+      if (AXES[spec]) return spec;
+      return ["+x", "-y", "+z"][ext.indexOf(Math.min(...ext))];
+    }
+    function frameCamera(spec = "auto") {
+      stats = stats || sceneStats();
+      const { lo, hi, ext } = stats;
+      resolvedUp = resolveUp(spec, ext);
+      const [axis, sign] = AXES[resolvedUp];
+      const extent = Math.max(...ext, 1e-3);
+      const center = lo.map((l, k) => 0.5 * (l + hi[k]));
+      const eye = [...center];
+      const floor = sign > 0 ? lo[axis] : hi[axis];
+      eye[axis] = floor + sign * 0.42 * ext[axis]; // standing eye height
+      const horizontal = [0, 1, 2].filter((k) => k !== axis);
+      const long = ext[horizontal[0]] >= ext[horizontal[1]] ? horizontal[0] : horizontal[1];
+      // Start near one end of the long side, looking down the room.
+      eye[long] = center[long] - 0.3 * ext[long];
+      const up = new THREE.Vector3(); up.setComponent(axis, sign);
+      const fwd = new THREE.Vector3(); fwd.setComponent(long, 1);
+      setBasis(up, fwd);
+      UP.copy(up);
+      yaw = 0; pitch = -0.08;
+      speed = Math.max(0.3, extent * 0.22);
+      const cam = viewer.camera;
+      cam.near = Math.max(0.01, extent / 600);
+      cam.far = extent * 50;
+      cam.fov = 70;
+      cam.updateProjectionMatrix();
+      cam.position.set(...eye);
+      applyLook();
+      home = { position: cam.position.clone(), yaw, pitch, center: new THREE.Vector3(...center), extent };
+      if (orbit) { orbit.target.copy(home.center); }
+      return resolvedUp;
+    }
+    function resetView() {
+      if (!home) return;
+      setMode("walk");
+      viewer.camera.position.copy(home.position);
+      yaw = home.yaw; pitch = home.pitch; velocity.set(0, 0, 0); glide.active = false;
+      applyLook();
+    }
+
+    // The studio calls these when the user flips the up axis.
+    window.setSplatUp = (spec) => (viewer && viewer.splatMesh ? frameCamera(spec) : null);
+    window.getSplatUp = () => resolvedUp;
+
+    // ---- modes ------------------------------------------------------------------------------------
+    function setMode(next) {
+      mode = next;
+      for (const [id, m] of [["b-walk", "walk"], ["b-orbit", "orbit"], ["b-tour", "tour"]]) $(id).setAttribute("aria-pressed", String(mode === m));
+      $("reticle").hidden = mode !== "walk";
+      if (mode === "orbit") {
+        // Dollhouse: pull back above the room and orbit its centre.
+        const cam = viewer.camera;
+        orbit.target.copy(home.center);
+        cam.up.copy(basis.up);
+        const back = flatForward().multiplyScalar(-home.extent * 0.9).add(basis.up.clone().multiplyScalar(home.extent * 0.7));
+        cam.position.copy(home.center).add(back);
+        cam.lookAt(home.center);
+        orbit.enabled = true;
+        orbit.update();
+      } else {
+        orbit.enabled = false;
+        if (mode === "walk" && home) {
+          // Return to eye height inside the room, keeping the current heading.
+          const [axis] = AXES[resolvedUp];
+          const pos = viewer.camera.position;
+          const inside = pos.distanceTo(home.center) < home.extent * 0.6;
+          if (!inside) { pos.copy(home.position); }
+          pos.setComponent(axis, home.position.getComponent(axis));
+          const dir = new THREE.Vector3(); viewer.camera.getWorldDirection(dir);
+          const flat = dir.clone().projectOnPlane(basis.up);
+          if (flat.lengthSq() > 1e-6) yaw = signedAngle(basis.fwd0, flat.normalize(), basis.up);
+          pitch = 0;
+          applyLook();
+        }
+      }
+    }
+    function signedAngle(a, b, axis) {
+      const angle = a.angleTo(b);
+      return new THREE.Vector3().crossVectors(a, b).dot(axis) < 0 ? -angle : angle;
+    }
+
+    // ---- input ------------------------------------------------------------------------------------
+    const keys = new Set();
+    const MOVE_KEYS = ["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "KeyQ", "KeyE", "ShiftLeft", "ShiftRight"];
+    addEventListener("keydown", (e) => {
+      if (e.target instanceof HTMLInputElement) return;
+      if (MOVE_KEYS.includes(e.code)) { keys.add(e.code); if (mode === "tour") setMode("walk"); e.preventDefault(); }
+      if (e.code === "KeyO") setMode(mode === "orbit" ? "walk" : "orbit");
+      if (e.code === "KeyT") setMode(mode === "tour" ? "walk" : "tour");
+      if (e.code === "KeyR") resetView();
+      if (e.code === "KeyF") toggleFullscreen();
+    });
+    addEventListener("keyup", (e) => keys.delete(e.code));
+    addEventListener("blur", () => keys.clear());
+
+    // Drag to look (mouse), one-finger right side look + left side joystick (touch).
+    const LOOK = 0.0042;
+    let drag = null;
+    const stick = { id: null, origin: null, vec: new THREE.Vector2() };
+    const stickEl = $("stick");
+    function onDown(e) {
+      if (!home || mode === "orbit" || e.target.closest(".panel")) return;
+      if (mode === "tour") setMode("walk");
+      if (e.pointerType === "touch" && e.clientX < innerWidth * 0.45 && stick.id === null) {
+        stick.id = e.pointerId; stick.origin = { x: e.clientX, y: e.clientY }; stick.vec.set(0, 0);
+        stickEl.style.display = "block"; stickEl.style.left = e.clientX + "px"; stickEl.style.top = e.clientY + "px";
+        stickEl.firstElementChild.style.transform = "";
+        return;
+      }
+      drag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0 };
+    }
+    function onMove(e) {
+      if (e.pointerId === stick.id) {
+        const dx = e.clientX - stick.origin.x, dy = e.clientY - stick.origin.y;
+        const r = Math.min(1, Math.hypot(dx, dy) / 48), a = Math.atan2(dy, dx);
+        stick.vec.set(Math.cos(a) * r, Math.sin(a) * r);
+        stickEl.firstElementChild.style.transform = `translate(${stick.vec.x * 34}px, ${stick.vec.y * 34}px)`;
+        return;
+      }
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      drag.x = e.clientX; drag.y = e.clientY; drag.moved += Math.abs(dx) + Math.abs(dy);
+      const k = e.pointerType === "touch" ? LOOK * 1.4 : LOOK;
+      yaw -= dx * k;
+      pitch = Math.max(-1.35, Math.min(1.35, pitch - dy * k));
+      glide.active = false;
+      applyLook();
+    }
+    function onUp(e) {
+      if (e.pointerId === stick.id) { stick.id = null; stick.vec.set(0, 0); stickEl.style.display = "none"; return; }
+      if (drag && e.pointerId === drag.id) drag = null;
+    }
+
+    // Double-click / double-tap: glide towards that point, at eye height, like stepping there.
+    function glideTo(clientX, clientY) {
+      if (!home || mode !== "walk") return;
+      const ndc = new THREE.Vector2((clientX / innerWidth) * 2 - 1, -(clientY / innerHeight) * 2 + 1);
+      const ray = new THREE.Raycaster(); ray.setFromCamera(ndc, viewer.camera);
+      const dir = ray.ray.direction.clone().projectOnPlane(basis.up);
+      if (dir.lengthSq() < 1e-6) return;
+      dir.normalize();
+      const step = home.extent * 0.22;
+      glide.to.copy(viewer.camera.position).addScaledVector(dir, step);
+      glide.active = true;
+      yaw = signedAngle(basis.fwd0, dir, basis.up);
+      applyLook();
+    }
+    let lastTap = 0;
+
+    // ---- per-frame motion -------------------------------------------------------------------------
     let last = performance.now();
+    let tourAngle = 0;
+    function tick(now) {
+      requestAnimationFrame(tick);
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      if (!viewer || !home) return;
+      const cam = viewer.camera;
+      if (mode === "orbit") { orbit.update(); return; }
+      if (mode === "tour") {
+        // Slow cinematic loop around the room at eye height, looking across it.
+        tourAngle += dt * 0.12;
+        const radius = home.extent * 0.22;
+        const around = basis.fwd0.clone().applyAxisAngle(basis.up, tourAngle);
+        const [axis] = AXES[resolvedUp];
+        cam.position.copy(home.center).addScaledVector(around, -radius);
+        cam.position.setComponent(axis, home.position.getComponent(axis));
+        yaw = tourAngle + Math.sin(tourAngle * 0.7) * 0.35;
+        pitch = -0.05;
+        applyLook();
+        return;
+      }
+      const fast = keys.has("ShiftLeft") || keys.has("ShiftRight") ? 2.4 : 1;
+      let f = (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
+      let s = (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0) - (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0);
+      f -= stick.vec.y; s += stick.vec.x;
+      const v = (keys.has("KeyE") ? 1 : 0) - (keys.has("KeyQ") ? 1 : 0);
+      const wish = new THREE.Vector3()
+        .addScaledVector(flatForward(), f)
+        .addScaledVector(new THREE.Vector3().crossVectors(flatForward(), basis.up).normalize(), s);
+      if (wish.lengthSq() > 1) wish.normalize();
+      wish.multiplyScalar(speed * fast).addScaledVector(basis.up, v * speed * 0.5);
+      if (wish.lengthSq() > 0) glide.active = false;
+      // Critically damped: quick to start, no drifting after you let go.
+      velocity.lerp(wish, 1 - Math.exp(-dt * 10));
+      cam.position.addScaledVector(velocity, dt);
+      if (glide.active) {
+        const delta = glide.to.clone().sub(cam.position);
+        const dist = delta.length();
+        if (dist < 0.01) glide.active = false;
+        else cam.position.addScaledVector(delta, 1 - Math.exp(-dt * 4));
+      }
+      applyLook();
+    }
+    requestAnimationFrame(tick);
 
+    // ---- viewer lifecycle -------------------------------------------------------------------------
     function formatForName(name) {
       const lower = (name || "").toLowerCase();
       if (lower.endsWith(".splat")) return GaussianSplats3D.SceneFormat.Splat;
       if (lower.endsWith(".ksplat")) return GaussianSplats3D.SceneFormat.KSplat;
       return GaussianSplats3D.SceneFormat.Ply;
     }
-
-    function percentile(values, p) {
-      const sorted = Float32Array.from(values).sort();
-      const i = Math.min(sorted.length - 1, Math.max(0, Math.floor(p * (sorted.length - 1))));
-      return sorted[i];
-    }
-
     function makeViewer() {
-      if (viewer) {
-        viewer.dispose?.();
-        document.querySelector("canvas")?.remove();
-      }
+      if (viewer) { viewer.dispose?.(); document.querySelector("canvas")?.remove(); }
       viewer = new GaussianSplats3D.Viewer({
         cameraUp: [0, -1, 0],
         initialCameraPosition: [0, 0, 3],
         initialCameraLookAt: [0, 0, 0],
-        sharedMemoryForWorkers: false,
+        sharedMemoryForWorkers: false,   // works without cross-origin isolation headers
         useBuiltInControls: false,
-        sphericalHarmonicsDegree: 3,
+        sphericalHarmonicsDegree: hd ? 3 : 0,
+        antialiased: hd,
+        // GPU sorting needs SharedArrayBuffer (cross-origin isolation), which we do not require.
+        gpuAcceleratedSort: false,
       });
       window.splatViewer = viewer; // console access for debugging
-      walk = new PointerLockControls(viewer.camera, document.body);
-      blocker.style.display = "flex";
-      blocker.onclick = () => walk.lock();
-      walk.addEventListener("lock", () => { blocker.style.display = "none"; });
-      walk.addEventListener("unlock", () => { blocker.style.display = "flex"; });
+      const canvas = viewer.renderer.domElement;
+      canvas.addEventListener("pointerdown", onDown);
+      addEventListener("pointermove", onMove);
+      addEventListener("pointerup", onUp);
+      addEventListener("pointercancel", onUp);
+      canvas.addEventListener("dblclick", (e) => glideTo(e.clientX, e.clientY));
+      canvas.addEventListener("pointerup", (e) => {
+        if (e.pointerType !== "touch" || e.clientX < innerWidth * 0.45) return;
+        const t = performance.now();
+        if (t - lastTap < 300) glideTo(e.clientX, e.clientY);
+        lastTap = t;
+      });
+      orbit = new OrbitControls(viewer.camera, canvas);
+      orbit.enableDamping = true;
+      orbit.dampingFactor = 0.08;
+      orbit.enabled = false;
     }
 
-    // Which world axis points up differs by trainer: COLMAP / the in-repo gsplat trainer use -Y,
-    // Nerfstudio (splatfacto) exports use +Z. "auto" treats the thinnest axis of the room as
-    // vertical and picks that trainer's sign. ?up= or setSplatUp() overrides it.
-    const AXES = { "+x": [0, 1], "-x": [0, -1], "+y": [1, 1], "-y": [1, -1], "+z": [2, 1], "-z": [2, -1] };
-    let stats = null;
-    let resolvedUp = "-y";
-
-    function sceneStats() {
-      const count = viewer.splatMesh.getSplatCount();
-      const centers = new Float32Array(count * 3);
-      viewer.splatMesh.fillSplatDataArrays(null, null, null, centers, null, null, true);
-      const lo = [], hi = [];
-      for (let axis = 0; axis < 3; axis++) {
-        const values = new Float32Array(count);
-        for (let i = 0; i < count; i++) values[i] = centers[i * 3 + axis];
-        lo.push(percentile(values, 0.1));
-        hi.push(percentile(values, 0.9));
-      }
-      return { lo, hi, ext: lo.map((l, k) => Math.max(hi[k] - l, 1e-3)) };
+    function setMessage(text, progress = null) {
+      $("status").hidden = false;
+      $("message").textContent = text;
+      $("bar").hidden = progress === null;
+      if (progress !== null) $("bar").firstElementChild.style.width = Math.round(progress) + "%";
     }
 
-    function resolveUp(spec, ext) {
-      if (AXES[spec]) return spec;
-      const thinnest = ext.indexOf(Math.min(...ext));
-      return ["+x", "-y", "+z"][thinnest];
-    }
-
-    function frameCamera(spec = "auto") {
-      stats = stats || sceneStats();
-      const { lo, hi, ext } = stats;
-      resolvedUp = resolveUp(spec, ext);
-      const [axis, sign] = AXES[resolvedUp];
-      const extent = Math.max(...ext, 1);
-      const eye = lo.map((l, k) => 0.5 * (l + hi[k]));
-      const floor = sign > 0 ? lo[axis] : hi[axis];
-      eye[axis] = floor + sign * 0.35 * ext[axis]; // about chest height above the floor
-      const horizontal = [0, 1, 2].filter((k) => k !== axis);
-      const forward = ext[horizontal[0]] >= ext[horizontal[1]] ? horizontal[0] : horizontal[1];
-      const target = [...eye];
-      target[forward] += extent * 0.25;
-      const up = [0, 0, 0];
-      up[axis] = sign;
-      moveSpeed = extent * 0.18;
-      viewer.camera.up.set(...up);
-      viewer.camera.near = Math.max(0.02, extent / 400);
-      viewer.camera.far = extent * 40;
-      viewer.camera.updateProjectionMatrix();
-      viewer.camera.position.set(...eye);
-      viewer.camera.lookAt(...target);
-      return resolvedUp;
-    }
-
-    // The studio calls this when the user flips the up axis.
-    window.setSplatUp = (spec) => (viewer && viewer.splatMesh ? frameCamera(spec) : null);
-    window.getSplatUp = () => resolvedUp;
-
+    let currentSource = null;
     async function loadSplat(url, format) {
-      status.textContent = "Loading splat…";
+      currentSource = { url, format };
+      setMessage("Loading the space…", 0);
+      $("pick").hidden = true;
       makeViewer();
       try {
         await viewer.addSplatScene(url, {
           format,
-          showLoadingUI: true,
-          splatAlphaRemovalThreshold: 1,
+          showLoadingUI: false,
+          progressiveLoad: false,
+          splatAlphaRemovalThreshold: 5, // drops near-invisible floaters
+          onProgress: (percent) => {
+            const p = Number(percent) || 0;
+            setMessage(p < 100 ? "Downloading the space…" : "Preparing the space…", Math.min(100, p));
+          },
         });
         stats = null;
-        frameCamera(new URLSearchParams(location.search).get("up") || "auto");
+        frameCamera(params.get("up") || "auto");
         viewer.start();
-        status.textContent = "Loaded. Click the view and walk with WASD.";
+        $("status").hidden = true;
+        $("toolbar").hidden = false;
+        $("reticle").hidden = false;
+        let seen = false;
+        try { seen = localStorage.getItem("indoor3d.walkHelpSeen") === "1"; } catch {}
+        $("help").hidden = embed || seen;
       } catch (err) {
-        status.textContent = "Could not load this splat: " + (err && err.message ? err.message : err);
+        setMessage("Could not load this space: " + (err && err.message ? err.message : err));
+        $("pick").hidden = false;
         throw err;
       }
     }
 
-    document.addEventListener("keydown", (e) => { if (e.code in keys) keys[e.code] = true; });
-    document.addEventListener("keyup", (e) => { if (e.code in keys) keys[e.code] = false; });
-
-    function tick(now) {
-      requestAnimationFrame(tick);
-      if (!walk || !walk.isLocked) {
-        last = now;
-        return;
-      }
-      const dt = Math.min(0.05, (now - last) / 1000);
-      last = now;
-      if (keys.KeyW) walk.moveForward(moveSpeed * dt);
-      if (keys.KeyS) walk.moveForward(-moveSpeed * dt);
-      if (keys.KeyA) walk.moveRight(-moveSpeed * dt);
-      if (keys.KeyD) walk.moveRight(moveSpeed * dt);
-      if (keys.KeyE) viewer.camera.position.addScaledVector(viewer.camera.up, moveSpeed * dt);
-      if (keys.KeyQ) viewer.camera.position.addScaledVector(viewer.camera.up, -moveSpeed * dt);
+    function toggleFullscreen() {
+      if (document.fullscreenElement) document.exitFullscreen?.();
+      else document.documentElement.requestFullscreen?.().catch(() => {});
     }
-    requestAnimationFrame(tick);
 
-    input.addEventListener("change", async () => {
-      const file = input.files && input.files[0];
-      if (!file) return;
-      try {
-        await loadSplat(URL.createObjectURL(file), formatForName(file.name));
-      } catch (err) {
-        console.error(err);
-      }
+    // ---- toolbar ----------------------------------------------------------------------------------
+    $("b-walk").onclick = () => setMode("walk");
+    $("b-orbit").onclick = () => setMode("orbit");
+    $("b-tour").onclick = () => setMode(mode === "tour" ? "walk" : "tour");
+    $("b-reset").onclick = resetView;
+    $("b-full").onclick = toggleFullscreen;
+    $("b-help").onclick = () => { $("help").hidden = !$("help").hidden; };
+    $("help").querySelector(".close").onclick = () => {
+      $("help").hidden = true;
+      try { localStorage.setItem("indoor3d.walkHelpSeen", "1"); } catch {}
+    };
+    $("b-quality").onclick = async () => {
+      // HD keeps view-dependent colour (spherical harmonics) and anti-aliasing; off is for slow devices.
+      hd = !hd;
+      $("b-quality").setAttribute("aria-pressed", String(hd));
+      if (!currentSource || !home) return;
+      const keep = { position: viewer.camera.position.clone(), yaw, pitch, up: resolvedUp };
+      await loadSplat(currentSource.url, currentSource.format);
+      frameCamera(keep.up);
+      viewer.camera.position.copy(keep.position); yaw = keep.yaw; pitch = keep.pitch; applyLook();
+    };
+
+    $("file").addEventListener("change", async () => {
+      const file = $("file").files && $("file").files[0];
+      if (file) loadSplat(URL.createObjectURL(file), formatForName(file.name)).catch(console.error);
     });
 
-    const params = new URLSearchParams(location.search);
-    if (params.get("embed") === "1") document.body.classList.add("embed");
     const requested = params.get("ply") || "";
     const plyUrl = requested.startsWith("/") ? requested : "";
     if (!plyUrl) {
-      status.textContent = "Drop a point_cloud.ply, or open Walk from the scene list.";
+      setMessage("Choose a splat (.ply), or open Walk from a project.");
     } else {
-      fetch(plyUrl)
+      // HEAD first so a missing splat gives a clear message without downloading anything twice.
+      fetch(plyUrl, { method: "HEAD" })
         .then((response) => {
-          if (!response.ok) {
-            status.textContent = "This scene has no walkable splat yet.";
-            return;
-          }
-          return loadSplat(plyUrl, GaussianSplats3D.SceneFormat.Ply);
+          if (!response.ok) { setMessage("This space has no walkable splat yet."); return; }
+          return loadSplat(plyUrl, formatForName(plyUrl));
         })
-        .catch((err) => {
-          console.error(err);
-          if (status.textContent.startsWith("Loading")) {
-            status.textContent = "Could not load this splat: " + (err && err.message ? err.message : err);
-          }
-        });
+        .catch((err) => console.error(err));
     }
   </script>
 </body>

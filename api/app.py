@@ -258,7 +258,7 @@ def create_app(store: JobStore | None = None, *, include_library: bool = False) 
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     # ---- files ----------------------------------------------------------------------------
-    @app.get("/jobs/{job_id}/point_cloud.ply")
+    @app.api_route("/jobs/{job_id}/point_cloud.ply", methods=["GET", "HEAD"])
     def download_splat(job_id: str) -> FileResponse:
         record = _require(job_id)
         ply = splat_path(record)
@@ -266,7 +266,7 @@ def create_app(store: JobStore | None = None, *, include_library: bool = False) 
             raise HTTPException(status_code=409, detail="The 3D file is not ready.")
         return FileResponse(ply, media_type="application/octet-stream", filename="point_cloud.ply")
 
-    @app.get("/jobs/{job_id}/mesh.glb")
+    @app.api_route("/jobs/{job_id}/mesh.glb", methods=["GET", "HEAD"])
     def download_mesh(job_id: str) -> FileResponse:
         record = _require(job_id)
         mesh = mesh_path(record)
