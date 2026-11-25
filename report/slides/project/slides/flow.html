@@ -1,0 +1,13 @@
+<section id="flow" class="paper">
+<div class="head"><p class="eyebrow">How it works</p><h2>Six steps from capture to sharing</h2></div>
+<div class="grid3" style="flex:1; grid-template-rows:1fr 1fr;">
+<div class="card in" style="--i:0"><p class="num">01 · CAPTURE</p><h3>Film the room</h3><p class="txt">Any smartphone video.</p></div>
+<div class="card in" style="--i:1"><p class="num">02 · UPLOAD</p><h3>Create a project</h3><p class="txt">Web platform checks length, size and quality.</p></div>
+<div class="card in" style="--i:2"><p class="num">03 · PROCESS</p><h3>Queue a job</h3><p class="txt">A worker picks it up; progress shows live.</p></div>
+<div class="card in" style="--i:3"><p class="num">04 · RECONSTRUCT</p><h3>Build the 3D room</h3><p class="txt">COLMAP poses, then a mesh or a Gaussian splat.</p></div>
+<div class="card in" style="--i:4"><p class="num">05 · EXPLORE</p><h3>Walk, orbit, tour</h3><p class="txt">3D Studio and the first-person walk viewer.</p></div>
+<div class="card hi in" style="--i:5"><p class="num">06 · SHARE</p><h3>Send a link</h3><p class="txt">Read-only share link or website embed.</p></div>
+</div>
+<p class="foot"><span>Indoor 3D Reconstruction</span><span class="pg"></span></p>
+<aside>Walk through the six steps. The important design point: the API never does the heavy work itself. It stores the video and queues a job; a separate worker does the reconstruction.</aside>
+</section>

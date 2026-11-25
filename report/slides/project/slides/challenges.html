@@ -1,0 +1,14 @@
+<section id="challenges" class="paper">
+<div class="head"><p class="eyebrow">Problems we hit, and fixed</p><h2>What real phone videos taught us</h2></div>
+<table style="font-size:28px;">
+<tr><th style="width:44%">Problem</th><th>Fix now in the code</th></tr>
+<tr><td>COLMAP split the video into pieces</td><td>Train on the largest piece: 216 frames, not 4</td></tr>
+<tr><td>COLMAP ran out of memory on 96 cores</td><td>Cap COLMAP to the CPUs the container may use</td></tr>
+<tr><td>Export crashed on new PyTorch</td><td>Allow loading our own Nerfstudio checkpoints</td></tr>
+<tr><td>A crash could lose an hour of training</td><td>Keep results and resume from checkpoints</td></tr>
+<tr><td>Viewer started inside noise, facing a wall</td><td>Start where the phone was, facing the most detail</td></tr>
+<tr><td>Vertical video: too few frames placed</td><td>Stop early with filming advice; refilm horizontally</td></tr>
+</table>
+<p class="foot"><span>Each fix has an automated test</span><span class="pg"></span></p>
+<aside>This slide shows engineering judgement. These were not textbook problems; they came from running on real footage and real cloud machines. COLMAP first split the video into four pieces and Nerfstudio read only the first, which had 4 frames; the fix picks the largest, which had 216. The first sample video, IMG_7916, was vertical and COLMAP could place only a few frames, so the room was refilmed horizontally as IMG_1299.</aside>
+</section>

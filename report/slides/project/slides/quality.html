@@ -1,0 +1,12 @@
+<section id="quality" class="dark">
+<div class="head"><p class="eyebrow">Engineering quality</p><h2>Tested, linted and checked on every push</h2></div>
+<div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:48px; flex:1; align-content:center; align-items:center;">
+<div class="stat in" style="--i:0"><p class="big">116</p><p class="lbl">automated tests (pytest), no GPU needed</p></div>
+<div class="stat in" style="--i:1"><p class="big">3</p><p class="lbl">CI jobs on GitHub Actions: tests, frontend, Docker</p></div>
+<div class="stat in" style="--i:2"><p class="big">0</p><p class="lbl">lint warnings (Ruff)</p></div>
+<div class="stat in" style="--i:3"><p class="big">30+</p><p class="lbl">commits, each explaining why</p></div>
+</div>
+<p class="muted">Large 3D files live in <b>Git LFS</b>. CI downloads only the small sample, to stay inside GitHub’s free bandwidth.</p>
+<p class="foot"><span>Indoor 3D Reconstruction</span><span class="pg"></span></p>
+<aside>Tests use stand-ins for COLMAP, Nerfstudio and ffmpeg, so they run in about 20 seconds on any laptop. Every bug fixed in this project got a test named after the behaviour it protects. CONTRIBUTING.md explains setup and conventions for the next developer.</aside>
+</section>

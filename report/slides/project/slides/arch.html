@@ -1,0 +1,22 @@
+<section id="arch">
+<div class="head"><p class="eyebrow">Architecture</p><h2>Separate services, one job table</h2></div>
+<div style="position:relative; width:1664px; height:600px;">
+<div class="node" style="left:0; top:240px; width:300px; height:120px;"><h3>Browser</h3><p>Web platform, viewer</p></div>
+<div class="node core" style="left:400px; top:240px; width:320px; height:120px;"><h3>API</h3><p>FastAPI · port 8000</p></div>
+<div class="node" style="left:820px; top:240px; width:320px; height:120px;"><h3>PostgreSQL</h3><p>Projects and jobs</p></div>
+<div class="node" style="left:820px; top:20px; width:320px; height:120px;"><h3>Redis</h3><p>Wakes the workers</p></div>
+<div class="node" style="left:1300px; top:20px; width:364px; height:120px;"><h3>Mesh worker</h3><p>CPU · Phases 1–9</p></div>
+<div class="node" style="left:820px; top:460px; width:320px; height:120px;"><h3>Worker gateway</h3><p>Token-protected</p></div>
+<div class="node gpu" style="left:1300px; top:460px; width:364px; height:120px;"><h3>GPU worker</h3><p>RunPod / Colab · splats</p></div>
+<x-connector class="wire" x1="300" y1="300" x2="400" y2="300" head="end"></x-connector>
+<x-connector class="wire" x1="720" y1="300" x2="820" y2="300" head="end"></x-connector>
+<x-connector class="wire" x1="560" y1="240" x2="820" y2="80" route="vh" head="end"></x-connector>
+<x-connector class="wire" x1="1140" y1="80" x2="1300" y2="80" head="end"></x-connector>
+<x-connector class="wire" x1="1482" y1="140" x2="1140" y2="300" route="vh" head="both"></x-connector>
+<x-connector class="wire" x1="980" y1="460" x2="980" y2="360" head="both"></x-connector>
+<x-connector class="wire gpu" x1="1300" y1="520" x2="1140" y2="520" head="both"></x-connector>
+<p class="tag" style="left:1160px; top:584px; width:300px;">Cloudflare tunnel</p>
+</div>
+<p class="foot"><span>Each box is its own Docker container (GPU worker runs on a rented machine)</span><span class="pg"></span></p>
+<aside>The API only stores uploads, writes jobs to Postgres and serves files. Workers read jobs from the same table; Redis just wakes them up faster. The GPU worker runs on a rented cloud machine and talks to our side through the worker gateway, with a secret token, over a Cloudflare tunnel. To handle more videos, add more workers.</aside>
+</section>

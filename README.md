@@ -16,6 +16,7 @@ This is an internship engineering project. The reconstruction engine is a reusab
 |---|---|
 | GitHub | https://github.com/prakrity26/ai-indoor-3d-reconstruction |
 | Progress log | [PROGRESS.md](PROGRESS.md) |
+| Project report and demo slides | [report/](report/README.md) |
 | Walkable splat sample | [`samples/img1299/`](samples/README.md): 561k Gaussians, trained on an RTX 4090 (Git LFS, 139 MB) |
 | Mesh sample | [`samples/img7916/`](samples/README.md) (Git LFS) |
 

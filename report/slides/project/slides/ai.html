@@ -1,0 +1,15 @@
+<section id="ai" class="paper">
+<div class="head"><p class="eyebrow">Computer vision and AI</p><h2>The reconstruction engine</h2></div>
+<table>
+<tr><th style="width:30%">Tool</th><th>What it does here</th></tr>
+<tr><td>ffmpeg · OpenCV</td><td>Extract frames, reject dark or blurry video, pick keyframes</td></tr>
+<tr><td>COLMAP</td><td>Finds where the phone was for every frame (Structure-from-Motion)</td></tr>
+<tr><td>Depth Anything V2</td><td>AI model that estimates depth in each frame (PyTorch, Hugging Face)</td></tr>
+<tr><td>Open3D</td><td>Point cloud clean-up and Poisson mesh</td></tr>
+<tr><td>YOLOv8</td><td>Labels objects in the room: bed, chair, laptop</td></tr>
+<tr><td>Nerfstudio splatfacto</td><td>Trains the photoreal Gaussian splat</td></tr>
+<tr><td>gsplat · PyTorch · CUDA</td><td>Fast GPU engine underneath the training</td></tr>
+</table>
+<p class="foot"><span>Indoor 3D Reconstruction</span><span class="pg"></span></p>
+<aside>One sentence to remember: COLMAP tells us where the camera was, and Nerfstudio learns half a million coloured blobs that recreate the room. Everything in this table is open source.</aside>
+</section>

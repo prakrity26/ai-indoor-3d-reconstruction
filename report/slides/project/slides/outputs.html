@@ -1,0 +1,27 @@
+<section id="outputs">
+<div class="head"><p class="eyebrow">Two kinds of 3D</p><h2>A quick mesh, or a photoreal splat</h2></div>
+<div class="grid2" style="flex:1;">
+<div class="card in" style="--i:0; gap:24px;">
+<p class="num">MESH · PHASES 1–9</p>
+<h3>Solid 3D model</h3>
+<ul class="clean">
+<li class="txt">Runs on any computer, no GPU</li>
+<li class="txt">Depth AI + Open3D Poisson surface</li>
+<li class="txt">Good for measuring and orbiting</li>
+<li class="txt">Looks coarse, like a clay model</li>
+</ul>
+</div>
+<div class="card hi in" style="--i:1; gap:24px;">
+<p class="num">GAUSSIAN SPLAT · GPU WORKER</p>
+<h3>Photoreal and walkable</h3>
+<ul class="clean">
+<li class="txt">Needs an NVIDIA GPU (rented on RunPod)</li>
+<li class="txt">COLMAP + Nerfstudio splatfacto</li>
+<li class="txt">Keeps real light, colour and detail</li>
+<li class="txt">First-person walk, like Captures Studio</li>
+</ul>
+</div>
+</div>
+<p class="foot"><span>Indoor 3D Reconstruction</span><span class="pg"></span></p>
+<aside>A Gaussian splat is hundreds of thousands of tiny coloured, semi-transparent blobs in 3D. Together they recreate the room from any angle, which is why it looks like a photo. A mesh is triangles, which is easier to compute but looks blocky.</aside>
+</section>

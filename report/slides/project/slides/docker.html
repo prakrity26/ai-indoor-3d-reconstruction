@@ -1,0 +1,14 @@
+<section id="docker">
+<div class="head"><p class="eyebrow">Infrastructure</p><h2>Production layout with Docker</h2></div>
+<div class="grid3" style="grid-template-rows:auto auto;">
+<div class="card hi in" style="--i:0"><p class="num">API</p><h3>indoor3d-api</h3><p class="txt">Web app, REST API and viewers</p></div>
+<div class="card in" style="--i:1"><p class="num">DATABASE</p><h3>postgres:16</h3><p class="txt">Projects and jobs, on a volume</p></div>
+<div class="card in" style="--i:2"><p class="num">QUEUE</p><h3>redis:7</h3><p class="txt">Fast wake-up for workers</p></div>
+<div class="card in" style="--i:3"><p class="num">CPU WORKER</p><h3>indoor3d-worker</h3><p class="txt">Mesh pipeline, Phases 1–9</p></div>
+<div class="card in" style="--i:4"><p class="num">GPU WORKER</p><h3>gpu-worker</h3><p class="txt">CUDA 12.4, Nerfstudio, splats</p></div>
+<div class="card in" style="--i:5"><p class="num">GATEWAY</p><h3>worker-gateway</h3><p class="txt">Lets remote GPUs fetch jobs</p></div>
+</div>
+<p class="muted">One <b>Dockerfile</b>, three build targets. <b>docker compose up</b> starts everything; the GPU worker is an optional profile.</p>
+<p class="foot"><span>Indoor 3D Reconstruction</span><span class="pg"></span></p>
+<aside>Mentors usually like this point: the database, the queue and the app are separate containers, so each can be scaled or replaced on its own. For this sample the GPU was a rented RunPod machine, about two dollars in total.</aside>
+</section>
