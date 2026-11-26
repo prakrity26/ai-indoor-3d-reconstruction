@@ -169,6 +169,44 @@ Before the review the repository was tidied so a new developer can follow it:
 - **Footage matters.** Vertical, fast or spinning videos may not reconstruct; the app now stops early and explains why.
 - **Splat size.** 139 MB is heavy for mobile data.
 - **Mesh quality.** The CPU mesh is coarse; the splat is the photoreal output.
+- **Plain walls, ceilings and floors look smeared.** See 8.1.
+
+### 8.1 Why plain walls and floors look smeared
+
+![Walk viewer: the desk, chair and curtain are sharp, while the plain wall and ceiling on the right are smeared](../samples/img1299/preview/plain_wall_artifact.jpg)
+
+In the sample, objects such as the desk, chair, curtains and clothes are sharp, but plain painted
+walls, the ceiling and parts of the floor show smears and floating blobs. This is a known limit of
+reconstruction from an ordinary camera, not a bug in the viewer.
+
+1. **COLMAP needs details to match.** It places the camera by finding the same distinctive points
+   (corners, edges, patterns, text) in several frames. Furniture and clothes have thousands of such
+   points. A smooth painted wall looks the same everywhere, so COLMAP finds almost nothing to match
+   and places almost no 3D points there.
+2. **The splat starts from COLMAP's points.** Gaussians begin where COLMAP put points. Where there
+   are many, they train into sharp detail. Where there are almost none, training has to guess, and
+   many Gaussians end up at the wrong depth or floating in the air.
+3. **Training can't see the mistake.** Training compares rendered views with the real frames. A
+   blob at the wrong depth on a beige wall still looks beige from the filmed angles, so it's never
+   corrected. It only shows when you view from a new angle, as in the walk viewer.
+4. **The walls were filmed less.** The phone mostly pointed at furniture, so walls, corners and
+   the ceiling appear in fewer frames, often darker and with motion blur. Shiny floors and windows
+   reflect and look different from each angle, which confuses matching further.
+
+**How it can be fixed** (not done yet):
+
+| Fix | Effect | Effort |
+|---|---|---|
+| Film again with all lights on, slow passes facing walls and corners, ceiling and floor included | Large | None, a re-film |
+| Put a few posters or sticky notes on plain walls while filming | Large | Very little |
+| Depth-supervised training using the project's Depth Anything model, so walls are pushed to the right, flat depth | Large | Medium, plus one GPU run (about $1–2) |
+| Plane-aware splatting (e.g. 2DGS, PGSR) that keeps walls and floors flat | Large | Higher, newer research methods |
+| Learned feature matching (SuperPoint + LightGlue) instead of SIFT, finding more points on weak texture | Medium | Medium |
+| LiDAR depth (iPhone Pro, iPad Pro) | Very large | Needs a LiDAR device |
+| Remove floating Gaussians after training | Cosmetic | Low |
+
+The recommended order is a better capture first, then depth-supervised training, because the depth
+model is already part of the mesh pipeline.
 
 ## 9. Suggested next steps
 

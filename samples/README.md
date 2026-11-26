@@ -15,6 +15,11 @@ RTX 4090. COLMAP placed 216 of 300 sampled frames; splatfacto ran 30,000 steps i
 
 ![Walk viewer: wardrobe and desk](img1299/preview/walk_wardrobe.jpg)
 
+Textured objects are sharp; plain walls and the ceiling are smeared
+([`plain_wall_artifact.jpg`](img1299/preview/plain_wall_artifact.jpg)). The reason is explained in
+[report §8.1](../report/PROJECT_REPORT.md#81-why-plain-walls-and-floors-look-smeared).
+[Walkthrough video (44 s)](https://github.com/prakrity26/ai-indoor-3d-reconstruction/releases/download/v1.0.0/img1299_walkthrough.mp4).
+
 ### Walk through it
 
 ```bash

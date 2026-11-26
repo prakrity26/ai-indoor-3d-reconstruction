@@ -266,6 +266,7 @@ Copy `.env.example` to `.env`. Key settings: `DATABASE_URL` (empty → SQLite in
 
 - **No authentication.** Single-user mode. "Private" means "no share link"; file URLs are not access-controlled. Put the app behind a trusted network or add auth before exposing it publicly.
 - Mesh quality is coarse and can look incomplete; scale is relative.
+- In splats, plain walls, ceilings and floors look smeared while textured objects are sharp: a camera-only method has no detail to match on a uniform surface. Why, and how it can be fixed: [report §8.1](report/PROJECT_REPORT.md#81-why-plain-walls-and-floors-look-smeared).
 - Walkable splats need an NVIDIA GPU (the `gpu-worker` image, a rented GPU, or Colab); the CPU `worker` runs only the mesh pipeline.
 - The splat viewer (GaussianSplats3D) did not render in the WebKit-based preview browser used during development; use a current Chrome, Edge, or Firefox for Walk mode.
 - Hotspots are placed on the mesh (Orbit mode), not inside the splat viewer.

@@ -36,6 +36,21 @@ Settings (`.env.example`): `SPLAT_NUM_FRAMES`, `SPLAT_TRAIN_STEPS`, `SPLAT_MAX_S
 See the root README, *Photoreal splats on a GPU*: a rented GPU (RunPod), the `gpu-worker` Docker
 image, or [`notebooks/colab_gpu_worker.ipynb`](../../notebooks/colab_gpu_worker.ipynb).
 
+## Known limitation: plain walls and floors
+
+![Sharp desk and curtain, smeared plain wall and ceiling](../../samples/img1299/preview/plain_wall_artifact.jpg)
+
+Textured objects reconstruct sharply; plain walls, ceilings and floors come out smeared or with
+floating Gaussians. COLMAP's SIFT features need distinctive detail, so a uniform wall gets almost
+no sparse points. Splatfacto initialises Gaussians from those points, so wall Gaussians start in
+the wrong place. The photometric loss can't correct them, because a blob at the wrong depth on a
+uniform wall still matches the training views. Fewer, darker frames of the walls make it worse.
+
+Mitigations, none implemented yet: better capture (lighting, wall-facing passes, temporary
+texture), depth-supervised training from Depth Anything, plane-aware splatting (2DGS, PGSR),
+learned matchers (SuperPoint + LightGlue), LiDAR depth, and floater pruning. Details and
+trade-offs: [report/PROJECT_REPORT.md §8.1](../../report/PROJECT_REPORT.md#81-why-plain-walls-and-floors-look-smeared).
+
 ## Filming
 
 Training cannot fix footage COLMAP cannot place. Hold the phone horizontally, walk slowly along
