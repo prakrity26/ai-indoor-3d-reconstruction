@@ -1,6 +1,8 @@
 # AI-Based Indoor 3D Reconstruction & Spatial Experience Platform
 
-![A bedroom reconstructed from a phone video, in the walk viewer](samples/img1299/preview/walk_wardrobe.jpg)
+[![A bedroom reconstructed from a phone video, in the walk viewer](samples/img1299/preview/walk_wardrobe.jpg)](https://github.com/prakrity26/ai-indoor-3d-reconstruction/releases/download/v1.0.0/img1299_walkthrough.mp4)
+
+▶ **[Watch the 44-second walkthrough](https://github.com/prakrity26/ai-indoor-3d-reconstruction/releases/download/v1.0.0/img1299_walkthrough.mp4)** (no install needed)
 
 Record a room with an ordinary smartphone, upload the video, and explore the reconstructed space as an interactive 3D scene in the browser. Add hotspots and saved viewpoints, then share a read-only link or embed the scene on a website.
 
@@ -17,7 +19,8 @@ This is an internship engineering project. The reconstruction engine is a reusab
 | GitHub | https://github.com/prakrity26/ai-indoor-3d-reconstruction |
 | Progress log | [PROGRESS.md](PROGRESS.md) |
 | Project report and demo slides | [report/](report/README.md) |
-| Walkable splat sample | [`samples/img1299/`](samples/README.md): 561k Gaussians, trained on an RTX 4090 (Git LFS, 139 MB) |
+| Walkable splat sample | [`samples/img1299/`](samples/README.md): 561k Gaussians, trained on an RTX 4090 (Git LFS, 139 MB) · [walkthrough video](https://github.com/prakrity26/ai-indoor-3d-reconstruction/releases/download/v1.0.0/img1299_walkthrough.mp4) |
+| Latest release | [v1.0.0](https://github.com/prakrity26/ai-indoor-3d-reconstruction/releases/tag/v1.0.0) |
 | Mesh sample | [`samples/img7916/`](samples/README.md) (Git LFS) |
 
 ## Quick start

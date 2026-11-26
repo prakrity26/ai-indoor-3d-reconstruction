@@ -25,6 +25,8 @@ one 109-second iPhone video:
 
 ![The reconstructed bedroom in the walk viewer](../samples/img1299/preview/walk_wardrobe.jpg)
 
+▶ **[Watch the 44-second walkthrough video](https://github.com/prakrity26/ai-indoor-3d-reconstruction/releases/download/v1.0.0/img1299_walkthrough.mp4)**, a screen recording of the walk viewer attached to the [v1.0.0 release](https://github.com/prakrity26/ai-indoor-3d-reconstruction/releases/tag/v1.0.0).
+
 ## 2. What the system does
 
 ```text
